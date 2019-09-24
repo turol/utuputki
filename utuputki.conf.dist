@@ -1,0 +1,53 @@
+[database]
+file=utuputki.sqlite
+; debug option PRAGMA reverse_unordered_selects = ON;
+reverse=false
+
+[downloader]
+verbose=false
+cacheDir=cache
+tempDir=/tmp
+
+maxmetadataage=60
+
+; raspberry pi only has hardware accleration for mp4
+extensionWhitelist=mp4
+vcodec=avc1
+
+; in seconds
+maxlength=900
+
+; in bytes
+maxfilesize=0
+maxwidth=1280
+maxheight=720
+maxfps=30
+maxaudiobitrate=0
+maxvideobitrate=0
+
+[global]
+setcoreulimit=true
+
+[logging]
+file=utuputki.log
+level=warning
+
+[player]
+fullscreen=true
+normalizeVolume=true
+audioOutput=
+audioDevice=
+vlcLogLevel=warning
+
+[webserver]
+clientTimeoutSeconds=600
+port=8080
+; in debug mode internal server errors details are reported to client
+debug=false
+acl=
+keepAlive=false
+keepAliveTimeoutMS=0
+websocketPingPong=false
+webSocketTimeoutMS=60000
+numThreads=50
+forwarders=127.0.0.1

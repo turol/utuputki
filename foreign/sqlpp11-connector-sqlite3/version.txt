@@ -1,0 +1,6 @@
+commit bde9fb214f36fee22e9d2f81dce95759cf4de287
+Merge: cf37829 494052d
+Author: Roland Bock <rb@theppro.com>
+Date:   Fri Jun 1 10:17:16 2018 +0200
+
+    Merge branch 'release/0.29'

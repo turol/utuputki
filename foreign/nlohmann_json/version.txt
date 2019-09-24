@@ -1,0 +1,6 @@
+commit 1126c9ca74fdea22d2ce3a065ac0fcb5792cbdaf
+Merge: b33093d6 efa1b9a7
+Author: Niels Lohmann <mail@nlohmann.me>
+Date:   Wed Mar 20 21:03:43 2019 +0100
+
+    Merge branch 'release/3.6.1' into develop

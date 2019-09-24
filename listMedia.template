@@ -1,0 +1,33 @@
+{% include "header.template" %}
+
+  <div>
+   <a href="/media?format=prettyJSON">Download as JSON</a>
+  </div>
+
+  <div>
+   <table>
+    <tr> <th>Id</th> <th>Title</th> <th>Duration</th> <th>Status</th> </tr>
+
+## for media in allMedia
+
+    <tr>
+     <td>{{ media.id }}</td>
+     {% if media.title == "" %}
+     <td><a href="{{ media.url }}">{{ media.url}}</a></td>
+     {% else %}
+     <td><a href="{{ media.url }}">{{ media.title}}</a></td>
+     {% endif %}
+     <td>{{ media.lengthReadable }}</td>
+     <td>{{ media.statusString }}
+     {% if media.status == 3 %}
+      {{ media.errorMessage }}
+     {% endif %}
+     </td>
+    </tr>
+
+## endfor
+
+   </table>
+  </div>
+
+{% include "footer.template" %}

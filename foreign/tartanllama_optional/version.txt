@@ -1,0 +1,7 @@
+commit 53697d4a36fdce313dd772b54379f1c3c981cdd5
+Author: Simon Brand <tartanllama@gmail.com>
+Date:   Wed May 1 09:40:40 2019 +0100
+
+    Make take always move
+    
+    Fixes #23

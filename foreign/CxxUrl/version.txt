@@ -1,0 +1,8 @@
+commit 7e7af0ce97b1021eaaf687ced1f65a5bd3e7d548
+Merge: 786c10b 522622f
+Author: Christophe Meessen <christophe@meessen.net>
+Date:   Wed Feb 6 15:45:03 2019 +0100
+
+    Merge pull request #3 from kuai6/master
+    
+    Add CMakeList.txt with Android detection and  to_string implementation

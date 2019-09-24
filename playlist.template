@@ -1,0 +1,61 @@
+{% include "header.template" %}
+
+  <div>
+   <form action="/addMedia" method="POST">
+    Add URL: 
+    <input type="reset" value="Clear">
+    <input type="text" name="media" size="50" placeholder="https://www.youtube.com/watch?v=">
+    <input type="submit" value="Submit">
+   </form>
+  </div>
+
+  <div>
+   <span class="playlist-empty"
+    {% if isObject(nowPlaying) %}
+     style="display: none;"
+    {% endif %}
+     >Playlist is empty. Why don't you add something?</span>
+   
+   {% if isObject(nowPlaying) %}
+    <span id="nowplaying" class="nowplaying" data-json='{{ nowPlaying }}' >Now playing: <a href="{{ nowPlaying.url }}">{{ nowPlaying.title }}</a>&nbsp;{{ nowPlaying.elapsed }}&nbsp;/&nbsp;{{ nowPlaying.lengthReadable }}
+    <form class="skip" action="/skip" method="POST">
+     <input type="hidden" id="media" name="media" value="{{ nowPlaying.mediaId }}">
+     <input type="submit" value="Skip">
+    </form>
+    Skips:&nbsp;{{ nowPlaying.skipCount }}&nbsp;/&nbsp;{{ nowPlaying.skipsNeeded }}</span>
+   {% else %}
+    <span class="nowplaying" data-json='' style="display: none;" ></span>
+   {% endif %}
+  </div>
+
+  <div class="playlist">
+   <table>
+    <tr> <th>Id</th> <th>Title</th> <th>Status</th> <th>Start</th> <th>Duration</th> </tr>
+
+## for media in playlist
+
+    <tr data-json='{{ media }}'>
+     <td>{{ media.id }}</td>
+     {% if media.title == "" %}
+     <td><a href="{{ media.url }}">{{ media.url}}</a></td>
+     {% else %}
+     <td><a href="{{ media.url }}">{{ media.title}}</a></td>
+     {% endif %}
+     <td>{{ media.statusString }}</td>
+     <td>{{ media.startTimeReadable }}</td>
+     <td>{{ media.lengthReadable }}</td>
+    </tr>
+
+## endfor
+
+   </table>
+  </div>
+
+  <div class="links">
+   <p>
+  	<a href="/history">History</a>
+  	<a href="/media">All media</a>
+   </p>
+  </div>
+
+{% include "footer.template" %}

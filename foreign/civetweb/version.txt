@@ -1,0 +1,8 @@
+commit ce8f6d38a60eb16c996afee1e5340f76ef4d0923
+Author: bel2125 <bel2125@gmail.com>
+Date:   Mon Sep 10 20:26:23 2018 +0200
+
+    Update RELEASE_NOTES for V1.11 Release
+    
+    Added selected headlines since last update:
+    git log --format=oneline eaad592ae6a70e491c51606c27885824495b925c..HEAD

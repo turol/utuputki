@@ -1,0 +1,5 @@
+commit 59676a24aa99a606330232d21ba9df39f13119df
+Author: Hugo Beauzée-Luyssen <hugo@beauzee.fr>
+Date:   Tue Nov 13 09:36:48 2018 +0100
+
+    Media: Fix build after minor API change

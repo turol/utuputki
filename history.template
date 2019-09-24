@@ -1,0 +1,31 @@
+{% include "header.template" %}
+
+  <div>
+   <a href="/history?format=prettyJSON">Download as JSON</a>
+  </div>
+
+  <div>
+   <table>
+    <tr> <th>Id</th> <th>Title</th> <th>Started</th> <th>Finished</th> <th>Duration</th> <th>Status</th> </tr>
+
+## for media in history
+
+    <tr>
+     <td>{{ media.id }}</td>
+     {% if media.title == "" %}
+     <td><a href="{{ media.url }}">{{ media.url}}</a></td>
+     {% else %}
+     <td><a href="{{ media.url }}">{{ media.title}}</a></td>
+     {% endif %}
+     <td>{{ media.startTimeReadable }}</td>
+     <td>{{ media.endTimeReadable }}</td>
+     <td>{{ media.lengthReadable }}</td>
+     <td>{{ media.finishReason }}</td>
+    </tr>
+
+## endfor
+
+   </table>
+  </div>
+
+{% include "footer.template" %}

@@ -1,0 +1,5 @@
+commit 9a19306fbf30642ca331d0ec88e7da54a96860f9
+Author: Wenzel Jakob <wenzel.jakob@epfl.ch>
+Date:   Tue Sep 11 10:12:10 2018 +0200
+
+    bump version to 2.2.4

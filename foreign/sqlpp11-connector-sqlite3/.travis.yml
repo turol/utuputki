@@ -1,0 +1,60 @@
+language: cpp
+
+os:
+  - linux
+  - osx
+
+sudo: required
+dist: trusty
+addons:
+  apt:
+    packages:
+    - sqlite3
+    - libboost-dev
+
+compiler:
+  - clang
+  - gcc
+
+env:
+  - CONFIG=Release
+  #- CONFIG=Debug
+
+notifications:
+ email:
+   on_success: change
+   on_failure: always
+
+install:
+  - g++ --version
+  - cmake --version
+  - pwd
+  - PROJECT_DIR="$PWD"
+  - BRANCH=`git rev-parse --abbrev-ref HEAD`
+  - cd ..
+  - pwd
+  - git clone https://github.com/HowardHinnant/date
+  - cd date
+  - git checkout tags/v2.4
+  - cd ..
+  - git clone https://github.com/rbock/sqlpp11
+  - if [ "$BRANCH" != "master" ]; then
+      cd sqlpp11
+      && git checkout develop
+      && cd ..
+      ;
+    fi
+  - cd "$PROJECT_DIR"
+
+before_script:
+   - mkdir build
+   - cd build
+   - if [[ "$CXX" = "g++" && "$CONFIG" = "Debug" && "$TRAVIS_OS_NAME" = "linux" ]]; then export CXXFLAGS="--coverage"; fi
+   - cmake .. -DCMAKE_BUILD_TYPE=$CONFIG -DHinnantDate_ROOT_DIR="../../date"
+
+script:
+   - cmake --build . --config $CONFIG
+   - ctest --output-on-failure
+
+after_script:
+  - ../coveralls

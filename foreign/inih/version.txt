@@ -1,0 +1,8 @@
+commit 1b9ee30b8380dfed8d9fe8ab59ad1a04515824b7
+Merge: 6ad9acf 7c9e125
+Author: Jan Tilly <jantilly@gmail.com>
+Date:   Tue Jan 8 13:19:18 2019 +0100
+
+    Merge pull request #12 from misson20000/file-constructor
+    
+    add INIReader(FILE*) constructor

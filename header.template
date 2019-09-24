@@ -1,0 +1,11 @@
+<html>
+ <head>
+  <meta charset="utf-8" />
+  <meta http-equiv="refresh" content="{{ refreshSeconds }}">
+  <link rel="stylesheet" type="text/css" href="utuputki.css">
+  <script src="utuputki.js"></script>
+  <title>{{ title }}</title>
+ </head>
+
+ <body>
+  <h1>{{ title }}</h1>
