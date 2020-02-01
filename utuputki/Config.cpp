@@ -1,6 +1,8 @@
 #include "utuputki/Config.h"
 #include "utuputki/Logger.h"
 
+#include <cassert>
+
 #include <inih/INIReader.h>
 
 
