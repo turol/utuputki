@@ -10,12 +10,13 @@ out
 *.msi
 *.exe
 *.zip
+*.trace
 [oO]utput
 [tT]esting
 
 *.o
 
-#################
+################# //hash
 ## CMake
 #################
 /CMakeCache.txt
@@ -267,3 +268,13 @@ requests.db
 ci/lua
 
 
+##########################
+## Conan test cache
+##########################
+conan/test_package/build
+
+
+##########################
+## Visual Studio Code
+##########################
+.vscode

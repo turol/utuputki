@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2018 the Civetweb developers
+/* Copyright (c) 2015-2020 the Civetweb developers
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -19,23 +19,25 @@
  * THE SOFTWARE.
  */
 
-/**
- * We include the source file so that we have access to the internal private
- * static functions
+/**********************************************************************************/
+/*
+ * We include the civetweb.c source file so that we have access to the internal
+ * private static functions
  */
+
 #ifdef _MSC_VER
-#ifndef _CRT_SECURE_NO_WARNINGS
-#define _CRT_SECURE_NO_WARNINGS
-#endif
+/* Since the C file is included, declare all API functions as static,
+ * to avoid linker errors in the test (seems to be required for MS
+ * toolchain only).
+ */
 #define CIVETWEB_API static
 #endif
 
-#ifdef REPLACE_CHECK_FOR_LOCAL_DEBUGGING
-#undef MEMORY_DEBUGGING
-#endif
-
 #include "../src/civetweb.c"
+/**********************************************************************************/
 
+
+/* Standard includes for the test code below */
 #include <stdlib.h>
 #include <time.h>
 
@@ -92,7 +94,6 @@ START_TEST(test_parse_http_message)
 
 	char req12[] =
 	    "POST /a/b/c.d?e=f&g HTTP/1.1\r\nKey1: val1\r\nKey2: val2\r\n\r\nBODY";
-
 
 	int lenreq1 = (int)strlen(req1);
 	int lenreq2 = (int)strlen(req2);
@@ -323,33 +324,66 @@ START_TEST(test_match_prefix)
 END_TEST
 
 
-START_TEST(test_remove_double_dots_and_double_slashes)
+START_TEST(test_remove_dot_segments)
 {
-	/* Adapted from unit_test.c */
-	/* Copyright (c) 2013-2015 the Civetweb developers */
-	/* Copyright (c) 2004-2013 Sergey Lyubka */
+	int i;
+
 	struct {
-		char before[20], after[20];
-	} data[] = {
-	    {"////a", "/a"},
-	    {"/.....", "/."},
-	    {"/......", "/"},
-	    {"..", "."},
-	    {"...", "."},
-	    {"/...///", "/./"},
-	    {"/a...///", "/a.../"},
-	    {"/.x", "/.x"},
-	    {"/\\", "/"},
-	    {"/a\\", "/a\\"},
-	    {"/a\\\\...", "/a\\."},
-	};
-	size_t i;
+		const char *input;
+		const char *expected_output;
+	} tests[] = {{"/path/to/file.ext", "/path/to/file.ext"},
+	             {"/file.ext", "/file.ext"},
+	             {"/path/../file.ext", "/file.ext"},
+	             {"/../to/file.ext", "/to/file.ext"},
+	             {"/../../file.ext", "/file.ext"},
+	             {"/./../file.ext", "/file.ext"},
+	             {"/.././file.ext", "/file.ext"},
+	             {"/././file.ext", "/file.ext"},
+	             {"/././file.ext", "/file.ext"},
+	             {"/path/.to/..file.ext", "/path/.to/..file.ext"},
+	             {"/file", "/file"},
+	             {"/path/", "/path/"},
+
+	             {"file.ext", "file.ext"},
+	             {"./file.ext", "file.ext"},
+	             {"../file.ext", "file.ext"},
+	             {".file.ext", ".file.ext"},
+	             {"..file.ext", "..file.ext"},
+	             {"file", "file"},
+	             {"/x/../", "/"},
+	             {"/x/../../", "/"},
+	             {"/x/.././", "/"},
+	             {"/./x/.././", "/"},
+
+	             /* Windows specific */
+	             {"\\file.ext", "/file.ext"},
+	             {"\\..\\file.ext", "/file.ext"},
+	             {"/file.", "/file"},
+	             {"/path\\to.\\.\\file.", "/path/to/file"},
+
+	             /* Multiple dots and slashes */
+	             {"\\//\\\\x", "/x"},
+	             {"//", "/"},
+	             {"/./", "/"},
+	             {"/../", "/"},
+	             {"/.../", "/"},
+	             {"/..../", "/"},
+	             {"/...../", "/"},
+	             {"/...../", "/"},
+	             {"/...//", "/"},
+	             {"/..././", "/"},
+	             {"/.../../", "/"},
+	             {"/.../.../", "/"},
+
+	             {NULL, NULL}};
 
 	mark_point();
 
-	for (i = 0; i < ARRAY_SIZE(data); i++) {
-		remove_double_dots_and_double_slashes(data[i].before);
-		ck_assert_str_eq(data[i].before, data[i].after);
+	for (i = 0; (tests[i].input != NULL); i++) {
+		char inout[256];
+		strcpy(inout, tests[i].input);
+		remove_dot_segments(inout);
+		ck_assert_str_eq(inout, tests[i].expected_output);
 	}
 }
 END_TEST
@@ -498,11 +532,11 @@ START_TEST(test_mg_vsnprintf)
 	/* If the string is truncated, mg_snprintf calls mg_cry.
 	 * If DEBUG is defined, mg_cry calls DEBUG_TRACE.
 	 * In DEBUG_TRACE_FUNC, flockfile(stdout) is called.
-	 * For Windows, flockfile/funlockfile calls Enter-/
-	 * LeaveCriticalSection(&global_log_file_lock).
+	 * For Windows, flockfile/funlockfile calls
+	 * pthread_mutex_lock/_unlock(&global_log_file_lock).
 	 * So, we need to initialize global_log_file_lock:
 	 */
-	InitializeCriticalSection(&global_log_file_lock);
+	pthread_mutex_init(&global_log_file_lock, &pthread_mutex_attr);
 #endif
 
 	memset(buf, 0, sizeof(buf));
@@ -562,57 +596,58 @@ END_TEST
 START_TEST(test_parse_port_string)
 {
 	/* Adapted from unit_test.c */
-	/* Copyright (c) 2013-2018 the Civetweb developers */
+	/* Copyright (c) 2013-2020 the Civetweb developers */
 	/* Copyright (c) 2004-2013 Sergey Lyubka */
 	struct t_test_parse_port_string {
 		const char *port_string;
 		int valid;
 		int ip_family;
+		uint16_t port_num;
 	};
 
 	static struct t_test_parse_port_string testdata[] =
-	{ {"0", 1, 4},
-	  {"1", 1, 4},
-	  {"65535", 1, 4},
-	  {"65536", 0, 0},
+	{ {"0", 1, 4, 0},
+	  {"1", 1, 4, 1},
+	  {"65535", 1, 4, 65535},
+	  {"65536", 0, 0, 0},
 
-	  {"1s", 1, 4},
-	  {"1r", 1, 4},
-	  {"1k", 0, 0},
+	  {"1s", 1, 4, 1},
+	  {"1r", 1, 4, 1},
+	  {"1k", 0, 0, 0},
 
-	  {"1.2.3", 0, 0},
-	  {"1.2.3.", 0, 0},
-	  {"1.2.3.4", 0, 0},
-	  {"1.2.3.4:", 0, 0},
+	  {"1.2.3", 0, 0, 0},
+	  {"1.2.3.", 0, 0, 0},
+	  {"1.2.3.4", 0, 0, 0},
+	  {"1.2.3.4:", 0, 0, 0},
 
-	  {"1.2.3.4:0", 1, 4},
-	  {"1.2.3.4:1", 1, 4},
-	  {"1.2.3.4:65535", 1, 4},
-	  {"1.2.3.4:65536", 0, 0},
+	  {"1.2.3.4:0", 1, 4, 0},
+	  {"1.2.3.4:1", 1, 4, 1},
+	  {"1.2.3.4:65535", 1, 4, 65535},
+	  {"1.2.3.4:65536", 0, 0, 0},
 
-	  {"1.2.3.4:1s", 1, 4},
-	  {"1.2.3.4:1r", 1, 4},
-	  {"1.2.3.4:1k", 0, 0},
+	  {"1.2.3.4:1s", 1, 4, 1},
+	  {"1.2.3.4:1r", 1, 4, 1},
+	  {"1.2.3.4:1k", 0, 0, 0},
 
 #if defined(USE_IPV6)
 	  /* IPv6 config */
-	  {"[::1]:123", 1, 6},
-	  {"[::]:80", 1, 6},
-	  {"[3ffe:2a00:100:7031::1]:900", 1, 6},
+	  {"[::1]:123", 1, 6, 123},
+	  {"[::]:80", 1, 6, 80},
+	  {"[3ffe:2a00:100:7031::1]:900", 1, 6, 900},
 
 	  /* IPv4 + IPv6 config */
-	  {"+80", 1, 4 + 6},
+	  {"+80", 1, 4 + 6, 80},
 #else
 	  /* IPv6 config: invalid if IPv6 is not activated */
-	  {"[::1]:123", 0, 0},
-	  {"[::]:80", 0, 0},
-	  {"[3ffe:2a00:100:7031::1]:900", 0, 0},
+	  {"[::1]:123", 0, 0, 123},
+	  {"[::]:80", 0, 0, 80},
+	  {"[3ffe:2a00:100:7031::1]:900", 0, 0, 900},
 
 	  /* IPv4 + IPv6 config: only IPv4 if IPv6 is not activated */
-	  {"+80", 1, 4},
+	  {"+80", 1, 4, 80},
 #endif
 
-	  {NULL, 0, 0} };
+	  {NULL, 0, 0, 0} };
 
 	struct socket so;
 	struct vec vec;
@@ -639,7 +674,27 @@ START_TEST(test_parse_port_string)
 			             ret,
 			             ip_family);
 		}
+		if (ip_family == 4) {
+			ck_assert_int_eq((int)so.lsa.sin.sin_family, (int)AF_INET);
+		}
+		if (ip_family == 6) {
+			ck_assert_int_eq((int)so.lsa.sin.sin_family, (int)AF_INET6);
+		}
+		if (ret) {
+			/* Test valid strings only */
+			ck_assert_int_eq(htons(so.lsa.sin.sin_port), testdata[i].port_num);
+		}
 	}
+
+	/* special case: localhost can be ipv4 or ipv6 */
+	vec.ptr = "localhost:123";
+	vec.len = strlen(vec.ptr);
+	ret = parse_port_string(&vec, &so, &ip_family);
+	ck_assert_int_eq(ret, 1);
+	if ((ip_family != 4) && (ip_family != 6)) {
+		ck_abort_msg("IP family must be 4 or 6 but is %i", (int)ip_family);
+	}
+	ck_assert_int_eq((int)htons(so.lsa.sin.sin_port), (int)123);
 }
 END_TEST
 
@@ -988,6 +1043,7 @@ START_TEST(test_config_options)
 	ck_assert_str_eq("keep_alive_timeout_ms",
 	                 config_options[KEEP_ALIVE_TIMEOUT].name);
 	ck_assert_str_eq("linger_timeout_ms", config_options[LINGER_TIMEOUT].name);
+	ck_assert_str_eq("listen_backlog", config_options[LISTEN_BACKLOG_SIZE].name);
 	ck_assert_str_eq("ssl_verify_peer",
 	                 config_options[SSL_DO_VERIFY_PEER].name);
 	ck_assert_str_eq("ssl_ca_path", config_options[SSL_CA_PATH].name);
@@ -1105,8 +1161,7 @@ make_private_suite(void)
 	tcase_set_timeout(tcase_url_parsing_1, civetweb_min_test_timeout);
 	suite_add_tcase(suite, tcase_url_parsing_1);
 
-	tcase_add_test(tcase_url_parsing_2,
-	               test_remove_double_dots_and_double_slashes);
+	tcase_add_test(tcase_url_parsing_2, test_remove_dot_segments);
 	tcase_set_timeout(tcase_url_parsing_2, civetweb_min_test_timeout);
 	suite_add_tcase(suite, tcase_url_parsing_2);
 
@@ -1177,7 +1232,7 @@ MAIN_PRIVATE(void)
 
 	test_alloc_vprintf(0);
 	test_mg_vsnprintf(0);
-	test_remove_double_dots_and_double_slashes(0);
+	test_remove_dot_segments(0);
 	test_parse_date_string(0);
 	test_parse_port_string(0);
 	test_parse_http_message(0);

@@ -11,7 +11,7 @@ Civetweb License
 
 ### Included with all features.
 
-> Copyright (c) 2013-2018 The CivetWeb developers ([CREDITS.md](https://github.com/civetweb/civetweb/blob/master/CREDITS.md))
+> Copyright (c) 2013-2020 The CivetWeb developers ([CREDITS.md](https://github.com/civetweb/civetweb/blob/master/CREDITS.md))
 >
 > Copyright (c) 2004-2013 Sergey Lyubka
 >
@@ -145,6 +145,11 @@ LuaXML License
 ------
 
 ### Included only if built with Lua and LuaXML support.
+
+Version 1.8.0 (Lua 5.2), 2013-06-10 by Gerald Franz, eludi.net
+
+Modified and extended 2015 by Bernhard Nortmann, https://github.com/n1tehawk/LuaXML – version 2.0.x, compatible with Lua 5.1 to 5.3 and LuaJIT.
+
 
 > LuaXML License
 >

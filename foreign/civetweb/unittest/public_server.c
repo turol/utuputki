@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2018 the Civetweb developers
+/* Copyright (c) 2015-2020 the Civetweb developers
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -151,8 +151,6 @@ START_TEST(test_the_test_environment)
 	char wd[300];
 	char buf[500];
 	FILE *f;
-	struct stat st;
-	int ret;
 	const char *ssl_cert = locate_ssl_cert();
 
 	memset(wd, 0, sizeof(wd));
@@ -183,23 +181,8 @@ START_TEST(test_the_test_environment)
 	if (f) {
 		fclose(f);
 	} else {
-		fprintf(stderr, "%s not found", buf);
-	}
-
-/* Check the test dir */
-#ifdef _WIN32
-	strcpy(buf, wd);
-	strcat(buf, "\\test");
-#else
-	strcpy(buf, wd);
-	strcat(buf, "/test");
-#endif
-
-	memset(&st, 0, sizeof(st));
-	ret = stat(buf, &st);
-
-	if (ret) {
-		fprintf(stderr, "%s not found", buf);
+		fprintf(stderr, "Certificate %s not found\n", buf);
+		exit(1); /* some path is not correct --> test will not work */
 	}
 
 
@@ -249,6 +232,7 @@ START_TEST(test_threading)
 }
 END_TEST
 
+static const char *lastMessage = NULL;
 
 static int
 log_msg_func(const struct mg_connection *conn, const char *message)
@@ -267,6 +251,7 @@ log_msg_func(const struct mg_connection *conn, const char *message)
 
 	printf("LOG_MSG_FUNC: %s\n", message);
 	mark_point();
+	lastMessage = message;
 
 	return 1; /* Return 1 means "already handled" */
 }
@@ -279,6 +264,7 @@ test_log_message(const struct mg_connection *conn, const char *message)
 
 	printf("LOG_MESSAGE: %s\n", message);
 	mark_point();
+	lastMessage = message;
 
 	return 0; /* Return 0 means "not yet handled" */
 }
@@ -287,7 +273,8 @@ test_log_message(const struct mg_connection *conn, const char *message)
 static struct mg_context *
 test_mg_start(const struct mg_callbacks *callbacks,
               void *user_data,
-              const char **configuration_options)
+              const char **configuration_options,
+              unsigned line)
 {
 	struct mg_context *ctx;
 	struct mg_callbacks cb;
@@ -308,9 +295,15 @@ test_mg_start(const struct mg_callbacks *callbacks,
 	ctx = mg_start(&cb, user_data, configuration_options);
 	mark_point();
 	if (ctx) {
-		/* Give the server some time to start in the test VM */
-		/* Don't need to do this if mg_start failed */
+		/* Give the server some time to start in the test VM. */
+		/* Don't need to do this if mg_start failed. */
 		test_sleep(SLEEP_AFTER_MG_START);
+	} else if (line > 0) {
+		/* mg_start is not supposed to fail anywhere, except for
+		 * special tests (for them, line is 0). */
+		ck_abort_msg("mg_start failed in line %u, message %s",
+		             line,
+		             (lastMessage ? lastMessage : "<NULL>"));
 	}
 	mark_point();
 
@@ -319,10 +312,11 @@ test_mg_start(const struct mg_callbacks *callbacks,
 
 
 static void
-test_mg_stop(struct mg_context *ctx)
+test_mg_stop(struct mg_context *ctx, unsigned line)
 {
+	(void)line;
 #ifdef __MACH__
-	/* For unknown reasons, there are sporadic hands
+	/* For unknown reasons, there are sporadic hangs
 	 * for OSX if mark_point is called here */
 	test_sleep(SLEEP_BEFORE_MG_STOP);
 	mg_stop(ctx);
@@ -359,7 +353,7 @@ test_mg_start_stop_http_server_impl(int ipv6, int bound)
 	char client_err[256];
 	const struct mg_response_info *client_ri;
 	int client_res, ret;
-	struct mg_server_ports portinfo[8];
+	struct mg_server_port portinfo[8];
 
 	mark_point();
 
@@ -393,7 +387,7 @@ test_mg_start_stop_http_server_impl(int ipv6, int bound)
 
 	callbacks.log_message = log_msg_func;
 
-	ctx = test_mg_start(&callbacks, (void *)errmsg, OPTIONS);
+	ctx = test_mg_start(&callbacks, (void *)errmsg, OPTIONS, __LINE__);
 
 	ck_assert_str_eq(errmsg, "");
 	ck_assert(ctx != NULL);
@@ -549,7 +543,7 @@ test_mg_start_stop_http_server_impl(int ipv6, int bound)
 	test_sleep(1);
 
 	/* End test */
-	test_mg_stop(ctx);
+	test_mg_stop(ctx, __LINE__);
 	mark_point();
 }
 
@@ -600,7 +594,7 @@ START_TEST(test_mg_start_stop_https_server)
 	char client_err[256];
 	const struct mg_response_info *client_ri;
 	int client_res, ret;
-	struct mg_server_ports portinfo[8];
+	struct mg_server_port portinfo[8];
 
 	ck_assert(ssl_cert != NULL);
 
@@ -628,7 +622,7 @@ START_TEST(test_mg_start_stop_https_server)
 
 	callbacks.log_message = log_msg_func;
 
-	ctx = test_mg_start(&callbacks, (void *)errmsg, OPTIONS);
+	ctx = test_mg_start(&callbacks, (void *)errmsg, OPTIONS, __LINE__);
 
 	ck_assert_str_eq(errmsg, "");
 	ck_assert(ctx != NULL);
@@ -700,7 +694,7 @@ START_TEST(test_mg_start_stop_https_server)
 
 	test_sleep(1);
 
-	test_mg_stop(ctx);
+	test_mg_stop(ctx, __LINE__);
 	mark_point();
 #endif
 }
@@ -714,7 +708,7 @@ START_TEST(test_mg_server_and_client_tls)
 	struct mg_context *ctx;
 
 	int ports_cnt;
-	struct mg_server_ports ports[16];
+	struct mg_server_port ports[16];
 	struct mg_callbacks callbacks;
 	char errmsg[256];
 
@@ -765,7 +759,7 @@ START_TEST(test_mg_server_and_client_tls)
 
 	callbacks.log_message = log_msg_func;
 
-	ctx = test_mg_start(&callbacks, (void *)errmsg, OPTIONS);
+	ctx = test_mg_start(&callbacks, (void *)errmsg, OPTIONS, __LINE__);
 
 	ck_assert_str_eq(errmsg, "");
 	ck_assert(ctx != NULL);
@@ -791,8 +785,25 @@ START_TEST(test_mg_server_and_client_tls)
 	client_conn =
 	    mg_connect_client("127.0.0.1", 8443, 1, client_err, sizeof(client_err));
 
-	ck_assert_str_ne(client_err, "");
+	/* cannot connect without client certificate */
+#if defined(__MACH__)
+	/* except for Apple (maybe this is specific to the MacOS container on TravisCI?) */
+	if (client_conn) {
+		mg_printf(client_conn, "GET / HTTP/1.0\r\n\r\n");
+		client_res =
+		    mg_get_response(client_conn, client_err, sizeof(client_err), 10000);
+		ck_assert_int_lt(client_res, 0); /* response is "error" (-1) */
+		ck_assert_str_ne(client_err, "");
+		client_ri = mg_get_response_info(client_conn);
+		ck_assert(client_ri == NULL);
+		
+		mg_close_connection(client_conn);
+		client_conn = NULL;
+		strcpy(client_err, "OpenSSL on MacOS allows to connect without a mandatory client certificate, but not data exchange");
+	}
+#endif
 	ck_assert(client_conn == NULL);
+	ck_assert_str_ne(client_err, "");
 
 	memset(client_err, 0, sizeof(client_err));
 	memset(&client_options, 0, sizeof(client_options));
@@ -831,7 +842,7 @@ START_TEST(test_mg_server_and_client_tls)
 
 	test_sleep(1);
 
-	test_mg_stop(ctx);
+	test_mg_stop(ctx, __LINE__);
 #endif
 	mark_point();
 }
@@ -847,16 +858,18 @@ request_test_handler(struct mg_connection *conn, void *cbdata)
 	char chunk_data[32];
 	const struct mg_request_info *ri;
 	struct mg_context *ctx;
-	void *ud, *cud;
+	void *ud, *cud, *ud2;
 	void *dummy = malloc(1);
 
 	ctx = mg_get_context(conn);
 	ud = mg_get_user_data(ctx);
+	ud2 = mg_get_user_context_data(conn);
 	ri = mg_get_request_info(conn);
 
 	ck_assert(ri != NULL);
 	ck_assert(ctx == g_ctx);
 	ck_assert(ud == &g_ctx);
+	ck_assert(ud == ud2);
 
 	ck_assert(dummy != NULL);
 
@@ -890,6 +903,7 @@ request_test_handler(struct mg_connection *conn, void *cbdata)
 	return 1;
 }
 
+static char request_handler2_url_expected[128] = {0};
 
 /* Return the same as request_test_handler using new interfaces */
 static int
@@ -899,15 +913,34 @@ request_test_handler2(struct mg_connection *conn, void *cbdata)
 	const char *chunk_data = "123456789A123456789B123456789C";
 	const struct mg_request_info *ri;
 	struct mg_context *ctx;
-	void *ud;
+	void *ud, *ud2;
+	int err_ret;
+	char url_buffer[128];
 
 	ctx = mg_get_context(conn);
 	ud = mg_get_user_data(ctx);
+	ud2 = mg_get_user_context_data(conn);
 	ri = mg_get_request_info(conn);
 
 	ck_assert(ri != NULL);
 	ck_assert(ctx == g_ctx);
 	ck_assert(ud == &g_ctx);
+	ck_assert(ud == ud2);
+
+	err_ret = mg_get_request_link(NULL,
+	                              url_buffer,
+	                              sizeof(url_buffer)); /* param error */
+	ck_assert(err_ret < 0);
+	err_ret =
+	    mg_get_request_link(conn, NULL, sizeof(url_buffer)); /* param error */
+	ck_assert(err_ret < 0);
+	err_ret = mg_get_request_link(conn, url_buffer, 0); /* param error */
+	ck_assert(err_ret < 0);
+	err_ret = mg_get_request_link(conn, url_buffer, 5); /* buffer too small */
+	ck_assert(err_ret < 0);
+	err_ret = mg_get_request_link(conn, url_buffer, sizeof(url_buffer));
+	ck_assert(err_ret == 0);
+	ck_assert_str_eq(url_buffer, request_handler2_url_expected);
 
 	mg_send_http_ok(conn, "text/plain", -1);
 
@@ -1234,13 +1267,15 @@ START_TEST(test_request_handlers)
 	char cmd_buf[1024];
 	char *cgi_env_opt;
 
+	const char *server_host = "test.domain";
+
 	mark_point();
 
 	memset((void *)OPTIONS, 0, sizeof(OPTIONS));
 	OPTIONS[opt_idx++] = "listening_ports";
 	OPTIONS[opt_idx++] = HTTP_PORT;
 	OPTIONS[opt_idx++] = "authentication_domain";
-	OPTIONS[opt_idx++] = "test.domain";
+	OPTIONS[opt_idx++] = server_host;
 #if !defined(NO_FILES)
 	OPTIONS[opt_idx++] = "document_root";
 	OPTIONS[opt_idx++] = ".";
@@ -1267,7 +1302,7 @@ START_TEST(test_request_handlers)
 	ck_assert(OPTIONS[sizeof(OPTIONS) / sizeof(OPTIONS[0]) - 1] == NULL);
 	ck_assert(OPTIONS[sizeof(OPTIONS) / sizeof(OPTIONS[0]) - 2] == NULL);
 
-	ctx = test_mg_start(NULL, &g_ctx, OPTIONS);
+	ctx = test_mg_start(NULL, &g_ctx, OPTIONS, __LINE__);
 
 	ck_assert(ctx != NULL);
 	g_ctx = ctx;
@@ -1322,6 +1357,10 @@ START_TEST(test_request_handlers)
 		                       (void *)(ptrdiff_t)i);
 	}
 
+	sprintf(request_handler2_url_expected,
+	        "http://%s:%u/handler2",
+	        server_host,
+	        ipv4_port);
 	mg_set_request_handler(ctx, "/handler2", request_test_handler2, NULL);
 
 #ifdef USE_WEBSOCKET
@@ -1501,6 +1540,7 @@ START_TEST(test_request_handlers)
 
 #ifdef _WIN32
 	f = fopen("test.cgi", "wb");
+	ck_assert(f != NULL);
 	cgi_script_content = "#!test.cgi.cmd\r\n";
 	fwrite(cgi_script_content, strlen(cgi_script_content), 1, f);
 	fclose(f);
@@ -1515,6 +1555,7 @@ START_TEST(test_request_handlers)
 	fclose(f);
 #else
 	f = fopen("test.cgi", "w");
+	ck_assert(f != NULL);
 	cgi_script_content = "#!/bin/sh\n\n"
 	                     "printf \"Connection: close\\r\\n\"\n"
 	                     "printf \"Content-Type: text/plain\\r\\n\"\n"
@@ -1564,7 +1605,11 @@ START_TEST(test_request_handlers)
 	sprintf(ebuf, "%scgi_test.cgi", locate_test_exes());
 
 	if (stat(ebuf, &st) != 0) {
+		char cwd[512];
+		getcwd(cwd, sizeof(cwd));
+
 		fprintf(stderr, "\nFile %s not found\n", ebuf);
+		fprintf(stderr, "Working directory is %s\n", cwd);
 		fprintf(stderr,
 		        "This file needs to be compiled manually before "
 		        "starting the test\n");
@@ -1572,8 +1617,10 @@ START_TEST(test_request_handlers)
 		        "e.g. by gcc test/cgi_test.c -o output/cgi_test.cgi\n\n");
 
 		/* Abort test with diagnostic message */
-		ck_abort_msg("Mandatory file %s must be built before starting the test",
-		             ebuf);
+		ck_abort_msg("Mandatory file %s must be built before starting the test "
+		             "(cwd: %s)",
+		             ebuf,
+		             cwd);
 	}
 #endif
 
@@ -1837,9 +1884,9 @@ START_TEST(test_request_handlers)
 
 	mg_printf(client_conn,
 	          "GET /handler2 HTTP/1.1\r\n"
-	          "Host: localhost\r\n"
+	          "Host: %s\r\n"
 	          "\r\n",
-	          ipv4_port);
+	          server_host);
 
 	i = mg_get_response(client_conn, ebuf, sizeof(ebuf), 10000);
 	ck_assert_int_ge(i, 0);
@@ -2199,7 +2246,7 @@ START_TEST(test_request_handlers)
 
 	/* Close the server */
 	g_ctx = NULL;
-	test_mg_stop(ctx);
+	test_mg_stop(ctx, __LINE__);
 	mark_point();
 
 #ifdef USE_WEBSOCKET
@@ -2608,7 +2655,7 @@ START_TEST(test_handle_form)
 	ck_assert(OPTIONS[sizeof(OPTIONS) / sizeof(OPTIONS[0]) - 1] == NULL);
 	ck_assert(OPTIONS[sizeof(OPTIONS) / sizeof(OPTIONS[0]) - 2] == NULL);
 
-	ctx = test_mg_start(NULL, &g_ctx, OPTIONS);
+	ctx = test_mg_start(NULL, &g_ctx, OPTIONS, __LINE__);
 
 	ck_assert(ctx != NULL);
 	g_ctx = ctx;
@@ -2845,7 +2892,7 @@ START_TEST(test_handle_form)
 		body_sent += chunk_len;
 		chunk_len = (chunk_len % 40) + 1;
 	}
-	mg_printf(client_conn, "0\r\n");
+	mg_printf(client_conn, "0\r\n\r\n");
 
 	for (sleep_cnt = 0; sleep_cnt < 30; sleep_cnt++) {
 		test_sleep(1);
@@ -2892,7 +2939,7 @@ START_TEST(test_handle_form)
 		body_sent += chunk_len;
 		chunk_len = (chunk_len % 40) + 1;
 	}
-	mg_printf(client_conn, "0\r\n");
+	mg_printf(client_conn, "0\r\n\r\n");
 
 	for (sleep_cnt = 0; sleep_cnt < 30; sleep_cnt++) {
 		test_sleep(1);
@@ -2963,7 +3010,7 @@ START_TEST(test_handle_form)
 	test_sleep(1);
 	send_chunk_string(client_conn, "eak_field_handler=abort&");
 	send_chunk_string(client_conn, "dontread=xyz");
-	mg_printf(client_conn, "0\r\n");
+	mg_printf(client_conn, "0\r\n\r\n");
 
 	for (sleep_cnt = 0; sleep_cnt < 30; sleep_cnt++) {
 		test_sleep(1);
@@ -3023,7 +3070,7 @@ START_TEST(test_handle_form)
 	send_chunk_string(client_conn, "xyz\r\n");
 	send_chunk_string(client_conn, "--multipart-form-data-boundary");
 	send_chunk_string(client_conn, "--see-RFC-2388--\r\n");
-	mg_printf(client_conn, "0\r\n");
+	mg_printf(client_conn, "0\r\n\r\n");
 
 	for (sleep_cnt = 0; sleep_cnt < 30; sleep_cnt++) {
 		test_sleep(1);
@@ -3115,7 +3162,7 @@ START_TEST(test_handle_form)
 	send_chunk_string(client_conn, "xyz\r\n");
 	send_chunk_string(client_conn, "--multipart-form-data-boundary");
 	send_chunk_string(client_conn, "--see-RFC-2388--\r\n");
-	mg_printf(client_conn, "0\r\n");
+	mg_printf(client_conn, "0\r\n\r\n");
 
 	for (sleep_cnt = 0; sleep_cnt < 30; sleep_cnt++) {
 		test_sleep(1);
@@ -3132,7 +3179,7 @@ START_TEST(test_handle_form)
 
 	/* Close the server */
 	g_ctx = NULL;
-	test_mg_stop(ctx);
+	test_mg_stop(ctx, __LINE__);
 	mark_point();
 }
 END_TEST
@@ -3179,7 +3226,7 @@ START_TEST(test_http_auth)
 	mark_point();
 
 	/* Start with default options */
-	ctx = test_mg_start(NULL, NULL, OPTIONS);
+	ctx = test_mg_start(NULL, NULL, OPTIONS, __LINE__);
 
 	ck_assert(ctx != NULL);
 	domain = mg_get_option(ctx, "authentication_domain");
@@ -3469,7 +3516,7 @@ START_TEST(test_http_auth)
 
 
 	/* Stop the server and clean up */
-	test_mg_stop(ctx);
+	test_mg_stop(ctx, __LINE__);
 	(void)remove(test_file);
 	(void)remove(passwd_file);
 	(void)remove("put_delete_auth_file.csv");
@@ -3506,7 +3553,7 @@ START_TEST(test_keep_alive)
 
 	mark_point();
 
-	ctx = test_mg_start(NULL, NULL, OPTIONS);
+	ctx = test_mg_start(NULL, NULL, OPTIONS, __LINE__);
 
 	ck_assert(ctx != NULL);
 
@@ -3553,7 +3600,7 @@ START_TEST(test_keep_alive)
 	 * (will only work if NO_FILES is not set). */
 
 	/* Stop the server and clean up */
-	test_mg_stop(ctx);
+	test_mg_stop(ctx, __LINE__);
 
 	mark_point();
 }
@@ -3600,7 +3647,7 @@ START_TEST(test_error_handling)
 
 	/* test with unknown option */
 	memset(errmsg, 0, sizeof(errmsg));
-	ctx = test_mg_start(&callbacks, (void *)errmsg, OPTIONS);
+	ctx = test_mg_start(&callbacks, (void *)errmsg, OPTIONS, 0);
 
 	/* Details of errmsg may vary, but it may not be empty */
 	ck_assert_str_ne(errmsg, "");
@@ -3616,7 +3663,7 @@ START_TEST(test_error_handling)
 
 	/* Test with bad num_thread option */
 	memset(errmsg, 0, sizeof(errmsg));
-	ctx = test_mg_start(&callbacks, (void *)errmsg, OPTIONS);
+	ctx = test_mg_start(&callbacks, (void *)errmsg, OPTIONS, 0);
 
 	/* Details of errmsg may vary, but it may not be empty */
 	ck_assert_str_ne(errmsg, "");
@@ -3632,7 +3679,7 @@ START_TEST(test_error_handling)
 
 	/* Test with bad num_thread option */
 	memset(errmsg, 0, sizeof(errmsg));
-	ctx = test_mg_start(&callbacks, (void *)errmsg, OPTIONS);
+	ctx = test_mg_start(&callbacks, (void *)errmsg, OPTIONS, 0);
 
 	/* Details of errmsg may vary, but it may not be empty */
 	ck_assert_str_ne(errmsg, "");
@@ -3655,7 +3702,7 @@ START_TEST(test_error_handling)
 	/* This time start the server with a valid configuration */
 	sprintf(bad_thread_num, "%i", 1);
 	memset(errmsg, 0, sizeof(errmsg));
-	ctx = test_mg_start(&callbacks, (void *)errmsg, OPTIONS);
+	ctx = test_mg_start(&callbacks, (void *)errmsg, OPTIONS, __LINE__);
 
 	ck_assert_str_eq(errmsg, "");
 	ck_assert(ctx != NULL);
@@ -3820,7 +3867,7 @@ START_TEST(test_error_handling)
 
 
 	/* Stop the server */
-	test_mg_stop(ctx);
+	test_mg_stop(ctx, __LINE__);
 
 
 	/* HTTP 1.1 GET request - must not work, since server is already stopped  */
@@ -3871,7 +3918,7 @@ START_TEST(test_error_log_file)
 #endif
 	OPTIONS[opt_cnt] = NULL;
 
-	ctx = test_mg_start(NULL, 0, OPTIONS);
+	ctx = test_mg_start(NULL, 0, OPTIONS, __LINE__);
 	ck_assert(ctx != NULL);
 
 	/* Remove log files (they may exist from previous incomplete runs of
@@ -3907,7 +3954,7 @@ START_TEST(test_error_log_file)
 	mg_close_connection(client);
 
 	/* Stop the server */
-	test_mg_stop(ctx);
+	test_mg_stop(ctx, __LINE__);
 
 
 	/* Check access.log */
@@ -3943,7 +3990,7 @@ START_TEST(test_error_log_file)
 	ck_assert_str_eq(OPTIONS[0], "listening_ports");
 	OPTIONS[1] = "bad !"; /* no r or s in string */
 
-	ctx = test_mg_start(NULL, 0, OPTIONS);
+	ctx = test_mg_start(NULL, 0, OPTIONS, 0);
 	ck_assert_msg(
 	    ctx == NULL,
 	    "Should not be able to start server with bad port configuration");
@@ -4079,7 +4126,7 @@ START_TEST(test_throttle)
 	callbacks.begin_request = test_throttle_begin_request;
 	callbacks.end_request = test_throttle_end_request;
 
-	ctx = test_mg_start(&callbacks, 0, OPTIONS);
+	ctx = test_mg_start(&callbacks, 0, OPTIONS, __LINE__);
 	ck_assert(ctx != NULL);
 
 	/* connect client */
@@ -4135,7 +4182,7 @@ START_TEST(test_throttle)
 	mg_close_connection(client);
 
 	/* Stop the server */
-	test_mg_stop(ctx);
+	test_mg_stop(ctx, __LINE__);
 
 	mark_point();
 }
@@ -4249,7 +4296,7 @@ START_TEST(test_large_file)
 	callbacks.begin_request = test_large_file_begin_request;
 	callbacks.log_message = log_msg_func;
 
-	ctx = test_mg_start(&callbacks, (void *)errmsg, OPTIONS);
+	ctx = test_mg_start(&callbacks, (void *)errmsg, OPTIONS, __LINE__);
 	ck_assert_str_eq(errmsg, "");
 	ck_assert(ctx != NULL);
 
@@ -4319,7 +4366,7 @@ START_TEST(test_large_file)
 #endif
 
 	/* Stop the server */
-	test_mg_stop(ctx);
+	test_mg_stop(ctx, __LINE__);
 
 	mark_point();
 }
@@ -4493,7 +4540,7 @@ START_TEST(test_mg_store_body)
 	test_sleep(5);
 
 	/* Stop the server */
-	test_mg_stop(ctx);
+	test_mg_stop(ctx, __LINE__);
 
 	/* Un-initialize the library */
 	mg_exit_library();
@@ -4571,7 +4618,7 @@ START_TEST(test_file_in_memory)
 	memset(&callbacks, 0, sizeof(callbacks));
 	callbacks.open_file = test_file_in_memory_open_file;
 
-	ctx = test_mg_start(&callbacks, 0, OPTIONS);
+	ctx = test_mg_start(&callbacks, 0, OPTIONS, __LINE__);
 	ck_assert(ctx != NULL);
 
 	/* connect client */
@@ -4621,7 +4668,7 @@ START_TEST(test_file_in_memory)
 	mg_close_connection(client);
 
 	/* Stop the server */
-	test_mg_stop(ctx);
+	test_mg_stop(ctx, __LINE__);
 
 	/* Free test data */
 	free(file_in_mem_data);
@@ -4667,7 +4714,7 @@ minimal_http_https_client_impl(const char *server,
 		             client_err_buf);
 	}
 
-	mg_printf(client, "GET /%s HTTP/1.0\r\n\r\n", uri);
+	mg_printf(client, "GET %s HTTP/1.0\r\n\r\n", uri);
 
 	r = mg_get_response(client, client_err_buf, sizeof(client_err_buf), 10000);
 
@@ -4684,8 +4731,14 @@ minimal_http_https_client_impl(const char *server,
 	ck_assert(client_ri != NULL);
 
 	/* Check for status code 200 OK or 30? moved */
-	if ((client_ri->status_code < 300) || (client_ri->status_code > 308)) {
-		ck_assert_int_eq(client_ri->status_code, 200);
+	if ((client_ri->status_code != 200)
+	    && (client_ri->status_code / 10 != 30)) {
+		ck_abort_msg("Request to %s://%s:%u/%s: Status %u",
+		             use_ssl ? "HTTPS" : "HTTP",
+		             server,
+		             port,
+		             uri,
+		             client_ri->status_code);
 	}
 
 	data_read = 0;
@@ -4736,7 +4789,7 @@ START_TEST(test_minimal_client)
 	/* Call a test client */
 	minimal_http_client_impl("192.30.253.113" /* www.github.com */,
 	                         80,
-	                         "civetweb/civetweb/");
+	                         "/civetweb/civetweb/");
 
 	mark_point();
 
@@ -4765,7 +4818,7 @@ START_TEST(test_minimal_tls_client)
 	/* Call a test client */
 	minimal_https_client_impl("192.30.253.113" /* www.github.com */,
 	                          443,
-	                          "civetweb/civetweb/");
+	                          "/civetweb/civetweb/");
 
 	mark_point();
 
@@ -4817,7 +4870,7 @@ START_TEST(test_minimal_http_server_callback)
 	mg_init_library(0);
 
 	/* Start the server */
-	ctx = test_mg_start(NULL, 0, NULL);
+	ctx = test_mg_start(NULL, 0, NULL, __LINE__);
 	ck_assert(ctx != NULL);
 
 	/* Add some handler */
@@ -4841,7 +4894,7 @@ START_TEST(test_minimal_http_server_callback)
 
 
 	/* Stop the server */
-	test_mg_stop(ctx);
+	test_mg_stop(ctx, __LINE__);
 
 	/* Un-initialize the library */
 	mg_exit_library();
@@ -4910,7 +4963,7 @@ START_TEST(test_minimal_https_server_callback)
 
 
 	/* Start the server */
-	ctx = test_mg_start(NULL, 0, OPTIONS);
+	ctx = test_mg_start(NULL, 0, OPTIONS, __LINE__);
 	ck_assert(ctx != NULL);
 
 	/* Add some handler */
@@ -4934,7 +4987,7 @@ START_TEST(test_minimal_https_server_callback)
 
 
 	/* Stop the server */
-	test_mg_stop(ctx);
+	test_mg_stop(ctx, __LINE__);
 
 	/* Un-initialize the library */
 	mg_exit_library();
@@ -5085,6 +5138,8 @@ MAIN_PUBLIC_SERVER(void)
 	unsigned f_avail = mg_check_feature(0xFF);
 	unsigned f_ret = mg_init_library(f_avail);
 	ck_assert_uint_eq(f_ret, f_avail);
+
+	test_handle_form(0);
 
 	test_the_test_environment(0);
 	test_threading(0);

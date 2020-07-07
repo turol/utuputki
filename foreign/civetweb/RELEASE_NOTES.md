@@ -1,3 +1,45 @@
+Release Notes v1.12
+===
+### Objectives: *Multiple improvements and extensions in various areas, including compatibility, Lua scripting, documentation*
+
+Changes
+-------
+
+- Updates/improvements for LuaXML
+- Updates and tests for JSON for Lua
+- BoringSSL support
+- Add Remark: Do not use Git for Windows V2.24 (but <= V2.23 or >= V2.25)
+- Format configuration dialogs for Windows
+- Add option "hide_tray" to start without Windows systray icon
+- URI checking according to "remove_dot_segments" algorithm from RFC
+- Experimental support for a new server and client start API
+- Additional callbacks to initialize external SSL context
+- More cache control options for static files
+- Trace function for Lua server pages
+- Access to client certificate data for Lua pages
+- Allow to configure SOMAXCONN (max. number of waiting connections)
+- Include some build options for Zephyr
+- Support for flawed CGI interpreters returning only <LF> instead of <CR><LF>
+- Add NO_FILESYSTEM flag for (embedded) system without any file system
+- Several fixes for server side Lua scripts
+- Disable SSL renegotiation for new OpenSSL version
+- Allow to force TLSv1.3 (disable TLSv1.2)
+- Prefer pre-compressed *.gz file, if it already exists
+- Fix some #include statements for various compilers / OS / SDK versions
+- Support for Linux Standard Base (LSB)
+- Fixes to mg_get_*_info() API functions
+- Fix some bugs/deficiencies in examples and tests
+- Fix some static source code analysis warnings
+- Add Conan package build
+- Fix include for Lua pages in "Kepler Syntax"
+- Replace some uses of deprecated Linux and OpenSSL API functions
+- Improved documentation and examples
+- Fixes for timeout handling
+- Fixes for the request queue (rare loss of requests)
+- Client side SNI
+- Update version number
+
+
 Release Notes v1.11
 ===
 ### Objectives: *Support multiple domains and certificates, support websocket ping-pong, on-the-fly compression, additional API functions*
@@ -19,7 +61,7 @@ Changes
 - Allow Kepler Syntax for Lua Server pages
 - Update duktape to 2.2.0 and Lua to 5.3.4
 - Optional support for on-the-fly compression (if zlib is available and USE_ZLIB is set)
-- Add method to replace mg\_cry and log\_access by own implemention
+- Add method to replace mg\_cry and log\_access by own implementation
 - Fixes for IPv6 support
 - Add server support for websocket ping pong protocol
 - Fix misspellings in source code and documentation

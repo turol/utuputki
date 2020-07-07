@@ -445,10 +445,10 @@ CivetServer::urlDecode(const char *src,
 	dst.clear();
 	for (i = j = 0; i < (int)src_len; i++, j++) {
 		if (i < (int)src_len - 2 && src[i] == '%'
-		    && isxdigit(*(const unsigned char *)(src + i + 1))
-		    && isxdigit(*(const unsigned char *)(src + i + 2))) {
-			a = tolower(*(const unsigned char *)(src + i + 1));
-			b = tolower(*(const unsigned char *)(src + i + 2));
+		    && isxdigit((unsigned char)src[i + 1])
+		    && isxdigit((unsigned char)src[i + 2])) {
+			a = tolower((unsigned char)src[i + 1]);
+			b = tolower((unsigned char)src[i + 2]);
 			dst.push_back((char)((HEXTOI(a) << 4) | HEXTOI(b)));
 			i += 2;
 		} else if (is_form_url_encoded && src[i] == '+') {
@@ -487,6 +487,7 @@ CivetServer::getParam(struct mg_connection *conn,
 			unsigned long con_len = strtoul(con_len_str, &end, 10);
 			if ((end == NULL) || (*end != 0)) {
 				// malformed header
+				mg_unlock_connection(conn);
 				return false;
 			}
 			if ((con_len > 0) && (con_len <= MAX_PARAM_BODY_LENGTH)) {
@@ -508,6 +509,7 @@ CivetServer::getParam(struct mg_connection *conn,
 			}
 			if (conobj.postData == NULL) {
 				// we cannot store the body
+				mg_unlock_connection(conn);
 				return false;
 			}
 		}
@@ -522,7 +524,7 @@ CivetServer::getParam(struct mg_connection *conn,
 	mg_unlock_connection(conn);
 
 	bool get_param_success = false;
-	if (!get_param_success && formParams != NULL) {
+	if (formParams != NULL) {
 		get_param_success =
 		    getParam(formParams, strlen(formParams), name, dst, occurrence);
 	}
@@ -567,7 +569,7 @@ CivetServer::getParam(const char *data,
 			assert(s >= p);
 
 			// Decode variable into destination buffer
-			urlDecode(p, (int)(s - p), dst, true);
+			urlDecode(p, (s - p), dst, true);
 			return true;
 		}
 	}
@@ -582,9 +584,7 @@ CivetServer::getPostData(struct mg_connection *conn)
 	char buf[2048];
 	int r = mg_read(conn, buf, sizeof(buf));
 	while (r > 0) {
-		std::string p = std::string(buf);
-		p.resize(r);
-		postdata += p;
+		postdata.append(buf, r);
 		r = mg_read(conn, buf, sizeof(buf));
 	}
 	mg_unlock_connection(conn);
@@ -610,13 +610,12 @@ CivetServer::urlEncode(const char *src,
 		dst.clear();
 
 	for (; src_len > 0; src++, src_len--) {
-		if (isalnum(*(const unsigned char *)src)
-		    || strchr(dont_escape, *(const unsigned char *)src) != NULL) {
+		if (isalnum((unsigned char)*src) || strchr(dont_escape, *src) != NULL) {
 			dst.push_back(*src);
 		} else {
 			dst.push_back('%');
-			dst.push_back(hex[(*(const unsigned char *)src) >> 4]);
-			dst.push_back(hex[(*(const unsigned char *)src) & 0xf]);
+			dst.push_back(hex[(unsigned char)*src >> 4]);
+			dst.push_back(hex[(unsigned char)*src & 0xf]);
 		}
 	}
 }
@@ -624,22 +623,29 @@ CivetServer::urlEncode(const char *src,
 std::vector<int>
 CivetServer::getListeningPorts()
 {
-	std::vector<int> ports(50);
-	std::vector<struct mg_server_ports> server_ports(50);
-	int size = mg_get_server_ports(context,
-	                               (int)server_ports.size(),
-	                               &server_ports[0]);
-	if (size <= 0) {
-		ports.resize(0);
-		return ports;
-	}
-	ports.resize(size);
-	server_ports.resize(size);
-	for (int i = 0; i < size; i++) {
+	std::vector<struct mg_server_port> server_ports = getListeningPortsFull();
+
+	std::vector<int> ports(server_ports.size());
+	for (size_t i = 0; i < server_ports.size(); i++) {
 		ports[i] = server_ports[i].port;
 	}
 
 	return ports;
+}
+
+std::vector<struct mg_server_port>
+CivetServer::getListeningPortsFull()
+{
+	std::vector<struct mg_server_port> server_ports(50);
+	int size = mg_get_server_ports(context,
+	                               (int)server_ports.size(),
+	                               &server_ports[0]);
+	if (size <= 0) {
+		server_ports.resize(0);
+		return server_ports;
+	}
+	server_ports.resize(size);
+	return server_ports;
 }
 
 CivetServer::CivetConnection::CivetConnection()
