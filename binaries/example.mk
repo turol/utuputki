@@ -38,7 +38,7 @@ LDFLAGS:=-g
 #LFDLAGS+=-Wl,--icf=all
 LDLIBS:=-lpthread
 LDLIBS_libvlc:=$(shell pkg-config --libs libvlc)
-LDLIBS_python+=$(shell pkg-config --libs python3)
+LDLIBS_python+=$(shell pkg-config --libs python3) $(shell pkg-config --libs python3-embed)
 LDLIBS_sqlite3:=$(shell pkg-config --libs sqlite3)
 
 LTOCFLAGS:=-flto -fuse-linker-plugin -fno-fat-lto-objects
