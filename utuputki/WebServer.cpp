@@ -784,9 +784,9 @@ WebServer::WebServerImpl::WebServerImpl(Utuputki &utuputki_, const Config &confi
 : utuputki(utuputki_)
 , serverOptions(makeServerOptions(config))
 , debugMode(config.getBool("webserver", "debug", false))
-, playlistTemplate(environment.parse(nonstd::string_view(reinterpret_cast<const char *>(&playlist_template[0]), playlist_template_length)))
-, historyTemplate(environment.parse(nonstd::string_view(reinterpret_cast<const char *>(&history_template[0]), history_template_length)))
-, listMediaTemplate(environment.parse(nonstd::string_view(reinterpret_cast<const char *>(&listMedia_template[0]), listMedia_template_length)))
+, playlistTemplate()
+, historyTemplate()
+, listMediaTemplate()
 , cssHandler(utuputki_css, utuputki_css_length, MIMEType::TextCSS)
 , jsHandler(utuputki_js, utuputki_js_length, MIMEType::TextJavaScript)
 , localTimeZone(date::current_zone())
@@ -795,6 +795,10 @@ WebServer::WebServerImpl::WebServerImpl(Utuputki &utuputki_, const Config &confi
 {
 	environment.include_template("footer.template", environment.parse(nonstd::string_view(reinterpret_cast<const char *>(&footer_template[0]), footer_template_length)));
 	environment.include_template("header.template", environment.parse(nonstd::string_view(reinterpret_cast<const char *>(&header_template[0]), header_template_length)));
+
+	playlistTemplate  = environment.parse(nonstd::string_view(reinterpret_cast<const char *>(&playlist_template[0]), playlist_template_length));
+	historyTemplate   = environment.parse(nonstd::string_view(reinterpret_cast<const char *>(&history_template[0]), history_template_length));
+	listMediaTemplate = environment.parse(nonstd::string_view(reinterpret_cast<const char *>(&listMedia_template[0]), listMedia_template_length));
 
 	{
 		auto forwardersList = config.getList("webserver", "forwarders");
