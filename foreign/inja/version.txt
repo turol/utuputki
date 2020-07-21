@@ -1,11 +1,6 @@
-commit 4c0ee3a46c0bbb279b0849e5a659e52684a37a98
-Author: Paul Fultz II <pfultz2@yahoo.com>
-Date:   Sat Feb 16 05:39:59 2019 -0600
+commit 652e378dd9bd80cc592aaed61773ea001d994eaf
+Merge: aad2cc4 c36cbac
+Author: pantor <lars.berscheid@online.de>
+Date:   Fri Dec 27 11:37:01 2019 +0100
 
-    Improve support for installing with cget (#88)
-    
-    * Improve support for installing with cget
-    
-    * add specific version, clean cmake
-    
-    * fix version to "v2.1.0"
+    Merge branch 'master' of https://github.com/pantor/inja

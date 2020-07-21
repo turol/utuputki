@@ -1,7 +1,12 @@
-#ifndef PANTOR_INJA_PARSER_HPP
-#define PANTOR_INJA_PARSER_HPP
+// Copyright (c) 2019 Pantor. All rights reserved.
+
+#ifndef INCLUDE_INJA_PARSER_HPP_
+#define INCLUDE_INJA_PARSER_HPP_
 
 #include <limits>
+#include <string>
+#include <utility> 
+#include <vector>
 
 #include "bytecode.hpp"
 #include "config.hpp"
@@ -18,6 +23,7 @@ namespace inja {
 
 class ParserStatic {
   ParserStatic() {
+    functions.add_builtin("at", 2, Bytecode::Op::At);
     functions.add_builtin("default", 2, Bytecode::Op::Default);
     functions.add_builtin("divisibleBy", 2, Bytecode::Op::DivisibleBy);
     functions.add_builtin("even", 1, Bytecode::Op::Even);
@@ -57,13 +63,16 @@ class ParserStatic {
   FunctionStorage functions;
 };
 
+/*!
+ * \brief Class for parsing an inja Template.
+ */
 class Parser {
  public:
   explicit Parser(const ParserConfig& parser_config, const LexerConfig& lexer_config, TemplateStorage& included_templates): m_config(parser_config), m_lexer(lexer_config), m_included_templates(included_templates), m_static(ParserStatic::get_instance()) { }
 
   bool parse_expression(Template& tmpl) {
     if (!parse_expression_and(tmpl)) return false;
-    if (m_tok.kind != Token::Kind::Id || m_tok.text != "or") return true;
+    if (m_tok.kind != Token::Kind::Id || m_tok.text != static_cast<decltype(m_tok.text)>("or")) return true;
     get_next_token();
     if (!parse_expression_and(tmpl)) return false;
     append_function(tmpl, Bytecode::Op::Or, 2);
@@ -72,7 +81,7 @@ class Parser {
 
   bool parse_expression_and(Template& tmpl) {
     if (!parse_expression_not(tmpl)) return false;
-    if (m_tok.kind != Token::Kind::Id || m_tok.text != "and") return true;
+    if (m_tok.kind != Token::Kind::Id || m_tok.text != static_cast<decltype(m_tok.text)>("and")) return true;
     get_next_token();
     if (!parse_expression_not(tmpl)) return false;
     append_function(tmpl, Bytecode::Op::And, 2);
@@ -80,7 +89,7 @@ class Parser {
   }
 
   bool parse_expression_not(Template& tmpl) {
-    if (m_tok.kind == Token::Kind::Id && m_tok.text == "not") {
+    if (m_tok.kind == Token::Kind::Id && m_tok.text == static_cast<decltype(m_tok.text)>("not")) {
       get_next_token();
       if (!parse_expression_not(tmpl)) return false;
       append_function(tmpl, Bytecode::Op::Not, 1);
@@ -95,7 +104,7 @@ class Parser {
     Bytecode::Op op;
     switch (m_tok.kind) {
       case Token::Kind::Id:
-        if (m_tok.text == "in")
+        if (m_tok.text == static_cast<decltype(m_tok.text)>("in"))
           op = Bytecode::Op::In;
         else
           return true;
@@ -183,7 +192,9 @@ class Parser {
               append_callback(tmpl, func_token.text, num_args);
               return true;
             }
-          } else if (m_tok.text == "true" || m_tok.text == "false" || m_tok.text == "null") {
+          } else if (m_tok.text == static_cast<decltype(m_tok.text)>("true") ||
+              m_tok.text == static_cast<decltype(m_tok.text)>("false") ||
+              m_tok.text == static_cast<decltype(m_tok.text)>("null")) {
             // true, false, null are json literals
             if (brace_level == 0 && bracket_level == 0) {
               json_first = m_tok.text;
@@ -262,18 +273,18 @@ class Parser {
   bool parse_statement(Template& tmpl, nonstd::string_view path) {
     if (m_tok.kind != Token::Kind::Id) return false;
 
-    if (m_tok.text == "if") {
+    if (m_tok.text == static_cast<decltype(m_tok.text)>("if")) {
       get_next_token();
 
       // evaluate expression
       if (!parse_expression(tmpl)) return false;
 
       // start a new if block on if stack
-      m_if_stack.emplace_back(tmpl.bytecodes.size());
+      m_if_stack.emplace_back(static_cast<decltype(m_if_stack)::value_type::jump_t>(tmpl.bytecodes.size()));
 
       // conditional jump; destination will be filled in by else or endif
       tmpl.bytecodes.emplace_back(Bytecode::Op::ConditionalJump);
-    } else if (m_tok.text == "endif") {
+    } else if (m_tok.text == static_cast<decltype(m_tok.text)>("endif")) {
       if (m_if_stack.empty()) {
         inja_throw("parser_error", "endif without matching if");
       }
@@ -292,7 +303,7 @@ class Parser {
 
       // pop if stack
       m_if_stack.pop_back();
-    } else if (m_tok.text == "else") {
+    } else if (m_tok.text == static_cast<decltype(m_tok.text)>("else")) {
       if (m_if_stack.empty())
         inja_throw("parser_error", "else without matching if");
       auto& if_data = m_if_stack.back();
@@ -308,7 +319,7 @@ class Parser {
       if_data.prev_cond_jump = std::numeric_limits<unsigned int>::max();
 
       // chained else if
-      if (m_tok.kind == Token::Kind::Id && m_tok.text == "if") {
+      if (m_tok.kind == Token::Kind::Id && m_tok.text == static_cast<decltype(m_tok.text)>("if")) {
         get_next_token();
 
         // evaluate expression
@@ -320,7 +331,7 @@ class Parser {
         // conditional jump; destination will be filled in by else or endif
         tmpl.bytecodes.emplace_back(Bytecode::Op::ConditionalJump);
       }
-    } else if (m_tok.text == "for") {
+    } else if (m_tok.text == static_cast<decltype(m_tok.text)>("for")) {
       get_next_token();
 
       // options: for a in arr; for a, b in obj
@@ -339,7 +350,7 @@ class Parser {
         get_next_token();
       }
 
-      if (m_tok.kind != Token::Kind::Id || m_tok.text != "in")
+      if (m_tok.kind != Token::Kind::Id || m_tok.text != static_cast<decltype(m_tok.text)>("in"))
         inja_throw("parser_error",
                    "expected 'in', got '" + m_tok.describe() + "'");
       get_next_token();
@@ -353,7 +364,7 @@ class Parser {
         tmpl.bytecodes.back().value = key_token.text;
       }
       tmpl.bytecodes.back().str = static_cast<std::string>(value_token.text);
-    } else if (m_tok.text == "endfor") {
+    } else if (m_tok.text == static_cast<decltype(m_tok.text)>("endfor")) {
       get_next_token();
       if (m_loop_stack.empty()) {
         inja_throw("parser_error", "endfor without matching for");
@@ -365,7 +376,7 @@ class Parser {
       tmpl.bytecodes.emplace_back(Bytecode::Op::EndLoop);
       tmpl.bytecodes.back().args = m_loop_stack.back() + 1;  // loop body
       m_loop_stack.pop_back();
-    } else if (m_tok.text == "include") {
+    } else if (m_tok.text == static_cast<decltype(m_tok.text)>("include")) {
       get_next_token();
 
       if (m_tok.kind != Token::Kind::String) {
@@ -381,8 +392,10 @@ class Parser {
       }
       // sys::path::remove_dots(pathname, true, sys::path::Style::posix);
 
-      Template include_template = parse_template(pathname);
-      m_included_templates.emplace(pathname, include_template);
+      if (m_included_templates.find(pathname) == m_included_templates.end()) {
+        Template include_template = parse_template(pathname);
+        m_included_templates.emplace(pathname, include_template);
+      }
 
       // generate a reference bytecode
       tmpl.bytecodes.emplace_back(Bytecode::Op::Include, json(pathname), Bytecode::Flag::ValueImmediate);
@@ -502,10 +515,10 @@ class Parser {
   }
 
   std::string load_file(nonstd::string_view filename) {
-		std::ifstream file(static_cast<std::string>(filename));
-		std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-		return text;
-	}
+    std::ifstream file = open_file_or_throw(static_cast<std::string>(filename));
+    std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    return text;
+  }
 
  private:
   const ParserConfig& m_config;
@@ -517,10 +530,14 @@ class Parser {
   const ParserStatic& m_static;
 
   struct IfData {
-    unsigned int prev_cond_jump;
-    std::vector<unsigned int> uncond_jumps;
+    using jump_t = unsigned int;
+    jump_t prev_cond_jump;
+    std::vector<jump_t> uncond_jumps;
 
-    explicit IfData(unsigned int condJump): prev_cond_jump(condJump) {}
+    explicit IfData(jump_t condJump)
+      : prev_cond_jump(condJump)
+    {
+    }
   };
 
   std::vector<IfData> m_if_stack;
@@ -545,4 +562,4 @@ class Parser {
 
 }  // namespace inja
 
-#endif  // PANTOR_INJA_PARSER_HPP
+#endif  // INCLUDE_INJA_PARSER_HPP_

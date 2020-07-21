@@ -3,7 +3,6 @@
 
 [![Build Status](https://travis-ci.org/pantor/inja.svg?branch=master)](https://travis-ci.org/pantor/inja)
 [![Build status](https://ci.appveyor.com/api/projects/status/qtgniyyg6fn8ich8/branch/master?svg=true)](https://ci.appveyor.com/project/pantor/inja)
-[![Coverage Status](https://img.shields.io/coveralls/pantor/inja.svg)](https://coveralls.io/r/pantor/inja)
 [![Codacy Status](https://api.codacy.com/project/badge/Grade/aa2041f1e6e648ae83945d29cfa0da17)](https://www.codacy.com/app/pantor/inja?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=pantor/inja&amp;utm_campaign=Badge_Grade)
 [![Github Releases](https://img.shields.io/github/release/pantor/inja.svg)](https://github.com/pantor/inja/releases)
 [![Github Issues](https://img.shields.io/github/issues/pantor/inja.svg)](http://github.com/pantor/inja/issues)
@@ -66,18 +65,19 @@ Environment env;
 std::string result = env.render("Hello {{ name }}!", data); // "Hello world!"
 
 // Or directly read a template file
-Template temp = env.parse_template("./template.txt");
+Template temp = env.parse_template("./templates/greeting.txt");
 std::string result = env.render(temp, data); // "Hello world!"
 
 data["name"] = "Inja";
 std::string result = env.render(temp, data); // "Hello Inja!"
 
-// Or read a json file for data directly from the environment
-result = env.render_file("./template.txt", "./data.json");
+// Or read the template file (and/or the json file) directly from the environment
+result = env.render_file("./templates/greeting.txt", data);
+result = env.render_file_with_json_file("./templates/greeting.txt", "./data.json");
 
 // Or write a rendered template file
 env.write(temp, data, "./result.txt");
-env.write_with_json_file("./template.txt", "./data.json", "./result.txt");
+env.write_with_json_file("./templates/greeting.txt", "./data.json", "./result.txt");
 ```
 
 The environment class can be configured to your needs.
@@ -118,7 +118,7 @@ render("{{ guests.1 }}", data); // "Tom"
 // Objects
 render("{{ time.start }} to {{ time.end }}pm", data); // "16 to 22pm"
 ```
-In general, the variables can be fetched using the [JSON Pointer](https://tools.ietf.org/html/rfc6901) syntax. For convenience, the leading `/` can be ommited. If no variable is found, valid JSON is printed directly, otherwise an error is thrown.
+In general, the variables can be fetched using the [JSON Pointer](https://tools.ietf.org/html/rfc6901) syntax. For convenience, the leading `/` can be omitted. If no variable is found, valid JSON is printed directly, otherwise an error is thrown.
 
 
 ### Statements
@@ -161,13 +161,14 @@ render("{% if not guest_count %}…{% endif %}", data); // True
 #### Includes
 
 You can either include other template files or already parsed templates.
-```
+```c++
 // Other template files are included relative from the current file location
-render({% include "footer.html" %}, data);
+render("{% include \"footer.html\" %}", data);
 
 // To include in-memory templates, add them to the environment first
-env.include_template("footer", temp);
-render({% include "footer" %}, data);
+inja::Template content_template = env.parse("Hello {{ neighbour }}!");
+env.include_template("content", content_template);
+env.render("Content: {% include \"content\" %}", data); // "Content: Hello Peter!"
 ```
 
 ### Functions
@@ -180,6 +181,7 @@ render("Hello {{ lower(neighbour) }}!", data); // "Hello peter!"
 
 // Range function, useful for loops
 render("{% for i in range(4) %}{{ loop.index1 }}{% endfor %}", data); // "1234"
+render("{% for i in range(3) %}{{ at(guests, i) }} {% endfor %}", data); // "Jeff Tom Patrick "
 
 // Length function (please don't combine with range, use list directly...)
 render("I count {{ length(guests) }} guests.", data); // "I count 3 guests."
@@ -224,6 +226,18 @@ render("{{ isString(neighbour) }}", data); // "true"
 render("{{ isArray(guests) }}", data); // "true"
 // Implemented type checks: isArray, isBoolean, isFloat, isInteger, isNumber, isObject, isString,
 ```
+
+### Whitespace Control
+
+In the default configuration, no whitespace is removed while rendering the file. To support a more readable template style, you can configure the environment to control whitespaces before and after a statement automatically. While enabling `set_trim` removes the first newline after a statement, `set_lstrip` strips tabs and spaces from the beginning of a line to the start of a block.
+
+```c++
+Environment env;
+env.set_trim(true);
+env.set_lstrip(true);
+```
+
+With both `trim` and `lstrip` enabled, you can put statements on their own lines.
 
 ### Callbacks
 

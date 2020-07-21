@@ -1,5 +1,7 @@
-#ifndef PANTOR_INJA_ENVIRONMENT_HPP
-#define PANTOR_INJA_ENVIRONMENT_HPP
+// Copyright (c) 2019 Pantor. All rights reserved.
+
+#ifndef INCLUDE_INJA_ENVIRONMENT_HPP_
+#define INCLUDE_INJA_ENVIRONMENT_HPP_
 
 #include <memory>
 #include <fstream>
@@ -15,82 +17,76 @@
 #include "renderer.hpp"
 #include "string_view.hpp"
 #include "template.hpp"
+#include "utils.hpp"
 
 
 namespace inja {
 
-using namespace nlohmann;
+using json = nlohmann::json;
 
+/*!
+ * \brief Class for changing the configuration.
+ */
 class Environment {
-  class Impl {
-   public:
-    std::string input_path;
-    std::string output_path;
-
-    LexerConfig lexer_config;
-    ParserConfig parser_config;
-
-    FunctionStorage callbacks;
-    TemplateStorage included_templates;
-  };
-
-  std::unique_ptr<Impl> m_impl;
-
  public:
-  Environment(): Environment("./") { }
+  Environment(): Environment("") { }
 
-  explicit Environment(const std::string& global_path): m_impl(stdinja::make_unique<Impl>()) {
-    m_impl->input_path = global_path;
-    m_impl->output_path = global_path;
-  }
+  explicit Environment(const std::string& global_path): m_input_path(global_path), m_output_path(global_path) {}
 
-  explicit Environment(const std::string& input_path, const std::string& output_path): m_impl(stdinja::make_unique<Impl>()) {
-    m_impl->input_path = input_path;
-    m_impl->output_path = output_path;
-  }
+  Environment(const std::string& input_path, const std::string& output_path): m_input_path(input_path), m_output_path(output_path) {}
 
   /// Sets the opener and closer for template statements
   void set_statement(const std::string& open, const std::string& close) {
-    m_impl->lexer_config.statement_open = open;
-    m_impl->lexer_config.statement_close = close;
-    m_impl->lexer_config.update_open_chars();
+    m_lexer_config.statement_open = open;
+    m_lexer_config.statement_close = close;
+    m_lexer_config.update_open_chars();
   }
 
   /// Sets the opener for template line statements
   void set_line_statement(const std::string& open) {
-    m_impl->lexer_config.line_statement = open;
-    m_impl->lexer_config.update_open_chars();
+    m_lexer_config.line_statement = open;
+    m_lexer_config.update_open_chars();
   }
 
   /// Sets the opener and closer for template expressions
   void set_expression(const std::string& open, const std::string& close) {
-    m_impl->lexer_config.expression_open = open;
-    m_impl->lexer_config.expression_close = close;
-    m_impl->lexer_config.update_open_chars();
+    m_lexer_config.expression_open = open;
+    m_lexer_config.expression_close = close;
+    m_lexer_config.update_open_chars();
   }
 
   /// Sets the opener and closer for template comments
   void set_comment(const std::string& open, const std::string& close) {
-    m_impl->lexer_config.comment_open = open;
-    m_impl->lexer_config.comment_close = close;
-    m_impl->lexer_config.update_open_chars();
+    m_lexer_config.comment_open = open;
+    m_lexer_config.comment_close = close;
+    m_lexer_config.update_open_chars();
+  }
+
+  /// Sets whether to remove the first newline after a block
+  void set_trim_blocks(bool trim_blocks) {
+    m_lexer_config.trim_blocks = trim_blocks;
+  }
+
+  /// Sets whether to strip the spaces and tabs from the start of a line to a block
+  void set_lstrip_blocks(bool lstrip_blocks) {
+    m_lexer_config.lstrip_blocks = lstrip_blocks;
   }
 
   /// Sets the element notation syntax
   void set_element_notation(ElementNotation notation) {
-    m_impl->parser_config.notation = notation;
+    m_parser_config.notation = notation;
   }
 
 
   Template parse(nonstd::string_view input) {
-    Parser parser(m_impl->parser_config, m_impl->lexer_config, m_impl->included_templates);
+    Parser parser(m_parser_config, m_lexer_config, m_included_templates);
     return parser.parse(input);
   }
 
   Template parse_template(const std::string& filename) {
-    Parser parser(m_impl->parser_config, m_impl->lexer_config, m_impl->included_templates);
-		return parser.parse_template(m_impl->input_path + static_cast<std::string>(filename));
-	}
+    Parser parser(m_parser_config, m_lexer_config, m_included_templates);
+    return parser.parse_template(m_input_path + static_cast<std::string>(filename));
+  }
 
   std::string render(nonstd::string_view input, const json& data) {
     return render(parse(input), data);
@@ -103,55 +99,55 @@ class Environment {
   }
 
   std::string render_file(const std::string& filename, const json& data) {
-		return render(parse_template(filename), data);
-	}
+    return render(parse_template(filename), data);
+  }
 
   std::string render_file_with_json_file(const std::string& filename, const std::string& filename_data) {
-		const json data = load_json(filename_data);
-		return render_file(filename, data);
-	}
+    const json data = load_json(filename_data);
+    return render_file(filename, data);
+  }
 
   void write(const std::string& filename, const json& data, const std::string& filename_out) {
-		std::ofstream file(m_impl->output_path + filename_out);
-		file << render_file(filename, data);
-		file.close();
-	}
+    std::ofstream file(m_output_path + filename_out);
+    file << render_file(filename, data);
+    file.close();
+  }
 
   void write(const Template& temp, const json& data, const std::string& filename_out) {
-		std::ofstream file(m_impl->output_path + filename_out);
-		file << render(temp, data);
-		file.close();
-	}
+    std::ofstream file(m_output_path + filename_out);
+    file << render(temp, data);
+    file.close();
+  }
 
-	void write_with_json_file(const std::string& filename, const std::string& filename_data, const std::string& filename_out) {
-		const json data = load_json(filename_data);
-		write(filename, data, filename_out);
-	}
+  void write_with_json_file(const std::string& filename, const std::string& filename_data, const std::string& filename_out) {
+    const json data = load_json(filename_data);
+    write(filename, data, filename_out);
+  }
 
-	void write_with_json_file(const Template& temp, const std::string& filename_data, const std::string& filename_out) {
-		const json data = load_json(filename_data);
-		write(temp, data, filename_out);
-	}
+  void write_with_json_file(const Template& temp, const std::string& filename_data, const std::string& filename_out) {
+    const json data = load_json(filename_data);
+    write(temp, data, filename_out);
+  }
 
   std::ostream& render_to(std::ostream& os, const Template& tmpl, const json& data) {
-    Renderer(m_impl->included_templates, m_impl->callbacks).render_to(os, tmpl, data);
+    Renderer(m_included_templates, m_callbacks).render_to(os, tmpl, data);
     return os;
   }
 
   std::string load_file(const std::string& filename) {
-    Parser parser(m_impl->parser_config, m_impl->lexer_config, m_impl->included_templates);
-		return parser.load_file(m_impl->input_path + filename);
-	}
+    Parser parser(m_parser_config, m_lexer_config, m_included_templates);
+    return parser.load_file(m_input_path + filename);
+  }
 
   json load_json(const std::string& filename) {
-		std::ifstream file(m_impl->input_path + filename);
-		json j;
-		file >> j;
-		return j;
-	}
+    std::ifstream file = open_file_or_throw(m_input_path + filename);
+    json j;
+    file >> j;
+    return j;
+  }
 
   void add_callback(const std::string& name, unsigned int numArgs, const CallbackFunction& callback) {
-    m_impl->callbacks.add_callback(name, numArgs, callback);
+    m_callbacks.add_callback(name, numArgs, callback);
   }
 
   /** Includes a template with a given name into the environment.
@@ -159,8 +155,18 @@ class Environment {
    * include "<name>" syntax.
    */
   void include_template(const std::string& name, const Template& tmpl) {
-    m_impl->included_templates[name] = tmpl;
+    m_included_templates[name] = tmpl;
   }
+
+ private:
+  std::string m_input_path;
+  std::string m_output_path;
+
+  LexerConfig m_lexer_config;
+  ParserConfig m_parser_config;
+
+  FunctionStorage m_callbacks;
+  TemplateStorage m_included_templates;
 };
 
 /*!
@@ -180,4 +186,4 @@ inline void render_to(std::ostream& os, nonstd::string_view input, const json& d
 
 }
 
-#endif // PANTOR_INJA_ENVIRONMENT_HPP
+#endif  // INCLUDE_INJA_ENVIRONMENT_HPP_

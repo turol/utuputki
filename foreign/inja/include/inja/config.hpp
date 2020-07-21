@@ -1,5 +1,7 @@
-#ifndef PANTOR_INJA_CONFIG_HPP
-#define PANTOR_INJA_CONFIG_HPP
+// Copyright (c) 2019 Pantor. All rights reserved.
+
+#ifndef INCLUDE_INJA_CONFIG_HPP_
+#define INCLUDE_INJA_CONFIG_HPP_
 
 #include <functional>
 #include <string>
@@ -14,6 +16,9 @@ enum class ElementNotation {
   Pointer
 };
 
+/*!
+ * \brief Class for lexer configuration.
+ */
 struct LexerConfig {
   std::string statement_open {"{%"};
   std::string statement_close {"%}"};
@@ -23,6 +28,9 @@ struct LexerConfig {
   std::string comment_open {"{#"};
   std::string comment_close {"#}"};
   std::string open_chars {"#{"};
+
+  bool trim_blocks {false};
+  bool lstrip_blocks {false};
 
   void update_open_chars() {
     open_chars = "";
@@ -41,10 +49,13 @@ struct LexerConfig {
   }
 };
 
+/*!
+ * \brief Class for parser configuration.
+ */
 struct ParserConfig {
   ElementNotation notation {ElementNotation::Dot};
 };
 
-}
+}  // namespace inja
 
-#endif // PANTOR_INJA_CONFIG_HPP
+#endif  // INCLUDE_INJA_CONFIG_HPP_
