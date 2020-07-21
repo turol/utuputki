@@ -1,6 +1,6 @@
-commit e9f6f07677e2832a5a84810ba777959e7ddd4e73
-Merge: c789f91 60267ab
-Author: rbock <rbock@eudoxos.de>
-Date:   Thu Apr 18 09:15:31 2019 +0200
+commit 2b5f8d76666374b69609a18726c9a18c66fa6fc4
+Merge: e9f6f07 23cb8f4
+Author: Roland Bock <rbock@eudoxos.de>
+Date:   Wed May 6 22:00:00 2020 +0200
 
-    Merge branch 'release/0.58'
+    Merge branch 'release/0.59'

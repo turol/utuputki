@@ -1,0 +1,50 @@
+language: cpp
+
+os:
+  - linux
+  - osx
+
+dist: xenial
+sudo: required
+
+compiler:
+  - clang
+  - gcc
+
+env:
+  - CONFIG=Release
+  - CONFIG=Release TESTS_CXX_STD=17
+  #- CONFIG=Debug
+
+notifications:
+ email:
+   on_success: change
+   on_failure: always
+
+install:
+  - g++ --version
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew upgrade cmake; fi
+  - cmake --version
+  - git clone https://github.com/HowardHinnant/date
+  - cd date
+  - git checkout tags/v2.4
+  - cd ..
+
+before_script:
+   - mkdir build
+   - cd build
+   - if [[ "$CONFIG" = "Debug" && "$TRAVIS_OS_NAME" = "linux" ]]; then
+         cp -r ../scripts/ . &&
+         cp -r ../test_scripts/ . &&
+         sudo apt-get install python-pyparsing;
+     fi
+   - if [[ "$CXX" = "g++" && "$CONFIG" = "Debug" && "$TRAVIS_OS_NAME" = "linux" ]]; then export CXXFLAGS="--coverage"; fi
+   - if [[ -n "${TESTS_CXX_STD:-}" && "$TRAVIS_OS_NAME" = "osx" ]]; then ADD_OPTS="-DSQLPP11_TESTS_CXX_STD=$TESTS_CXX_STD"; fi
+   - cmake .. -DCMAKE_BUILD_TYPE=$CONFIG -DCMAKE_PREFIX_PATH=$PWD/../date $ADD_OPTS
+
+script:
+   - cmake --build . --config $CONFIG
+   - ctest --output-on-failure
+
+after_script:
+  - ../coveralls
