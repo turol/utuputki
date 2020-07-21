@@ -97,7 +97,14 @@ namespace sqlpp
     class SQLPP11_SQLITE3_EXPORT connection : public sqlpp::connection
     {
       std::unique_ptr<detail::connection_handle> _handle;
-      bool _transaction_active = false;
+      enum class transaction_status_type
+      {
+        none,
+        maybe,
+        active
+      };
+
+      transaction_status_type _transaction_status = transaction_status_type::none;
 
       // direct execution
       bind_result_t select_impl(const std::string& statement);
@@ -137,11 +144,11 @@ namespace sqlpp
       }
 
       connection(connection_config config);
+      connection(connection&&) noexcept;
+      connection& operator=(connection&&) noexcept;
       ~connection();
       connection(const connection&) = delete;
-      connection(connection&&) = delete;
       connection& operator=(const connection&) = delete;
-      connection& operator=(connection&&) = delete;
 
       //! select returns a result (which can be iterated row by row)
       template <typename Select>
@@ -264,8 +271,8 @@ namespace sqlpp
         return prepare_impl(context.str());
       }
 
-      template <typename PreparedInsert>
-      void run_prepared_execute(const PreparedInsert& x)
+      template <typename PreparedExecute>
+      size_t run_prepared_execute(const PreparedExecute& x)
       {
         x._prepared_statement._reset();
         x._bind_params();

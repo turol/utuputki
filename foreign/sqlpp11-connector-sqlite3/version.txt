@@ -1,6 +1,6 @@
-commit bde9fb214f36fee22e9d2f81dce95759cf4de287
-Merge: cf37829 494052d
-Author: Roland Bock <rb@theppro.com>
-Date:   Fri Jun 1 10:17:16 2018 +0200
+commit a06d6944a55349fbd0ab0337c45d80c6efa2ff81
+Merge: cea5614 66af21f
+Author: Roland Bock <rbock@eudoxos.de>
+Date:   Mon Jul 6 20:14:39 2020 +0200
 
-    Merge branch 'release/0.29'
+    Merge branch 'release/0.30'
