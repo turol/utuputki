@@ -1,5 +1,5 @@
-commit a1b71df137e015d44f7e31f7b6d4807253fb7871
+commit 00a0aa992953d6482114a0f539a21bb535a16383
 Author: Wenzel Jakob <wenzel.jakob@epfl.ch>
-Date:   Wed Jun 19 10:48:36 2019 +0200
+Date:   Thu Sep 19 23:06:22 2019 +0200
 
-    fix issue #1804 (warning about redefined macros)
+    v2.4.0 release
