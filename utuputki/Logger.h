@@ -4,7 +4,7 @@
 
 #include <memory>
 
-#include <fmt/format.h>
+#include <fmt/core.h>
 
 
 namespace utuputki {
