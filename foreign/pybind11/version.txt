@@ -1,5 +1,5 @@
-commit 00a0aa992953d6482114a0f539a21bb535a16383
+commit e44fcc3c15b41f0720c72832c0b9cd07de819781
 Author: Wenzel Jakob <wenzel.jakob@epfl.ch>
-Date:   Thu Sep 19 23:06:22 2019 +0200
+Date:   Fri Sep 20 11:10:49 2019 +0200
 
-    v2.4.0 release
+    v2.4.1 release
