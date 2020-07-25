@@ -6,6 +6,7 @@
 // For the license information refer to format.h.
 
 #include <stdint.h>
+
 #include <cctype>
 #include <cfloat>
 #include <climits>
@@ -45,6 +46,7 @@ using fmt::format_error;
 using fmt::memory_buffer;
 using fmt::string_view;
 using fmt::wmemory_buffer;
+using fmt::wstring_view;
 using fmt::internal::basic_writer;
 using fmt::internal::max_value;
 
@@ -400,26 +402,17 @@ TEST(MemoryBufferTest, ExceptionInDeallocate) {
   EXPECT_CALL(alloc, deallocate(&mem2[0], 2 * size));
 }
 
-#ifdef _WIN32
-TEST(UtilTest, UTF16ToUTF8) {
-  std::string s = "ёжик";
-  fmt::internal::utf16_to_utf8 u(L"\x0451\x0436\x0438\x043A");
-  EXPECT_EQ(s, u.str());
-  EXPECT_EQ(s.size(), u.size());
-}
-
-TEST(UtilTest, UTF16ToUTF8EmptyString) {
-  std::string s = "";
-  fmt::internal::utf16_to_utf8 u(L"");
-  EXPECT_EQ(s, u.str());
-  EXPECT_EQ(s.size(), u.size());
-}
-
 TEST(UtilTest, UTF8ToUTF16) {
-  std::string s = "лошадка";
-  fmt::internal::utf8_to_utf16 u(s.c_str());
+  fmt::internal::utf8_to_utf16 u("лошадка");
   EXPECT_EQ(L"\x043B\x043E\x0448\x0430\x0434\x043A\x0430", u.str());
   EXPECT_EQ(7, u.size());
+  // U+10437 { DESERET SMALL LETTER YEE }
+  EXPECT_EQ(L"\xD801\xDC37", fmt::internal::utf8_to_utf16("𐐷").str());
+  EXPECT_THROW_MSG(fmt::internal::utf8_to_utf16("\xc3\x28"), std::runtime_error,
+                   "invalid utf8");
+  EXPECT_THROW_MSG(fmt::internal::utf8_to_utf16(fmt::string_view("л", 1)),
+                   std::runtime_error, "invalid utf8");
+  EXPECT_EQ(L"123456", fmt::internal::utf8_to_utf16("123456").str());
 }
 
 TEST(UtilTest, UTF8ToUTF16EmptyString) {
@@ -427,59 +420,6 @@ TEST(UtilTest, UTF8ToUTF16EmptyString) {
   fmt::internal::utf8_to_utf16 u(s.c_str());
   EXPECT_EQ(L"", u.str());
   EXPECT_EQ(s.size(), u.size());
-}
-
-template <typename Converter, typename Char>
-void check_utf_conversion_error(
-    const char* message,
-    fmt::basic_string_view<Char> str = fmt::basic_string_view<Char>(0, 1)) {
-  fmt::memory_buffer out;
-  fmt::internal::format_windows_error(out, ERROR_INVALID_PARAMETER, message);
-  fmt::system_error error(0, "");
-  try {
-    (Converter)(str);
-  } catch (const fmt::system_error& e) {
-    error = e;
-  }
-  EXPECT_EQ(ERROR_INVALID_PARAMETER, error.error_code());
-  EXPECT_EQ(fmt::to_string(out), error.what());
-}
-
-TEST(UtilTest, UTF16ToUTF8Error) {
-  check_utf_conversion_error<fmt::internal::utf16_to_utf8, wchar_t>(
-      "cannot convert string from UTF-16 to UTF-8");
-}
-
-TEST(UtilTest, UTF8ToUTF16Error) {
-  const char* message = "cannot convert string from UTF-8 to UTF-16";
-  check_utf_conversion_error<fmt::internal::utf8_to_utf16, char>(message);
-  check_utf_conversion_error<fmt::internal::utf8_to_utf16, char>(
-      message, fmt::string_view("foo", INT_MAX + 1u));
-}
-
-TEST(UtilTest, UTF16ToUTF8Convert) {
-  fmt::internal::utf16_to_utf8 u;
-  EXPECT_EQ(ERROR_INVALID_PARAMETER, u.convert(fmt::wstring_view(0, 1)));
-  EXPECT_EQ(ERROR_INVALID_PARAMETER,
-            u.convert(fmt::wstring_view(L"foo", INT_MAX + 1u)));
-}
-#endif  // _WIN32
-
-typedef void (*FormatErrorMessage)(fmt::internal::buffer<char>& out,
-                                   int error_code, string_view message);
-
-template <typename Error>
-void check_throw_error(int error_code, FormatErrorMessage format) {
-  fmt::system_error error(0, "");
-  try {
-    throw Error(error_code, "test {}", "error");
-  } catch (const fmt::system_error& e) {
-    error = e;
-  }
-  fmt::memory_buffer message;
-  format(message, error_code, "test error");
-  EXPECT_EQ(to_string(message), error.what());
-  EXPECT_EQ(error_code, error.error_code());
 }
 
 TEST(UtilTest, FormatSystemError) {
@@ -510,7 +450,17 @@ TEST(UtilTest, SystemError) {
   fmt::system_error e(EDOM, "test");
   EXPECT_EQ(fmt::format("test: {}", get_system_error(EDOM)), e.what());
   EXPECT_EQ(EDOM, e.error_code());
-  check_throw_error<fmt::system_error>(EDOM, fmt::format_system_error);
+
+  fmt::system_error error(0, "");
+  try {
+    throw fmt::system_error(EDOM, "test {}", "error");
+  } catch (const fmt::system_error& e) {
+    error = e;
+  }
+  fmt::memory_buffer message;
+  fmt::format_system_error(message, EDOM, "test error");
+  EXPECT_EQ(to_string(message), error.what());
+  EXPECT_EQ(EDOM, error.error_code());
 }
 
 TEST(UtilTest, ReportSystemError) {
@@ -520,69 +470,6 @@ TEST(UtilTest, ReportSystemError) {
   EXPECT_WRITE(stderr, fmt::report_system_error(EDOM, "test error"),
                to_string(out));
 }
-
-#ifdef _WIN32
-
-TEST(UtilTest, FormatWindowsError) {
-  LPWSTR message = 0;
-  FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-                     FORMAT_MESSAGE_IGNORE_INSERTS,
-                 0, ERROR_FILE_EXISTS,
-                 MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                 reinterpret_cast<LPWSTR>(&message), 0, 0);
-  fmt::internal::utf16_to_utf8 utf8_message(message);
-  LocalFree(message);
-  fmt::memory_buffer actual_message;
-  fmt::internal::format_windows_error(actual_message, ERROR_FILE_EXISTS,
-                                      "test");
-  EXPECT_EQ(fmt::format("test: {}", utf8_message.str()),
-            fmt::to_string(actual_message));
-  actual_message.resize(0);
-  fmt::internal::format_windows_error(actual_message, ERROR_FILE_EXISTS,
-                                      fmt::string_view(0, max_value<size_t>()));
-  EXPECT_EQ(fmt::format("error {}", ERROR_FILE_EXISTS),
-            fmt::to_string(actual_message));
-}
-
-TEST(UtilTest, FormatLongWindowsError) {
-  LPWSTR message = 0;
-  // this error code is not available on all Windows platforms and
-  // Windows SDKs, so do not fail the test if the error string cannot
-  // be retrieved.
-  const int provisioning_not_allowed =
-      0x80284013L /*TBS_E_PROVISIONING_NOT_ALLOWED*/;
-  if (FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER |
-                         FORMAT_MESSAGE_FROM_SYSTEM |
-                         FORMAT_MESSAGE_IGNORE_INSERTS,
-                     0, static_cast<DWORD>(provisioning_not_allowed),
-                     MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                     reinterpret_cast<LPWSTR>(&message), 0, 0) == 0) {
-    return;
-  }
-  fmt::internal::utf16_to_utf8 utf8_message(message);
-  LocalFree(message);
-  fmt::memory_buffer actual_message;
-  fmt::internal::format_windows_error(actual_message, provisioning_not_allowed,
-                                      "test");
-  EXPECT_EQ(fmt::format("test: {}", utf8_message.str()),
-            fmt::to_string(actual_message));
-}
-
-TEST(UtilTest, WindowsError) {
-  check_throw_error<fmt::windows_error>(ERROR_FILE_EXISTS,
-                                        fmt::internal::format_windows_error);
-}
-
-TEST(UtilTest, ReportWindowsError) {
-  fmt::memory_buffer out;
-  fmt::internal::format_windows_error(out, ERROR_FILE_EXISTS, "test error");
-  out.push_back('\n');
-  EXPECT_WRITE(stderr,
-               fmt::report_windows_error(ERROR_FILE_EXISTS, "test error"),
-               fmt::to_string(out));
-}
-
-#endif  // _WIN32
 
 TEST(StringViewTest, Ctor) {
   EXPECT_STREQ("abc", string_view("abc").data());
@@ -930,6 +817,9 @@ TEST(FormatterTest, Fill) {
   EXPECT_EQ("**0xface", format("{0:*>8}", reinterpret_cast<void*>(0xface)));
   EXPECT_EQ("foo=", format("{:}=", "foo"));
   EXPECT_EQ(std::string("\0\0\0*", 4), format(string_view("{:\0>4}", 6), '*'));
+  EXPECT_EQ("жж42", format("{0:ж>4}", 42));
+  EXPECT_THROW_MSG(format("{:\x80\x80\x80\x80\x80>}", 0), format_error,
+                   "invalid fill");
 }
 
 TEST(FormatterTest, PlusSign) {
@@ -1040,6 +930,10 @@ TEST(FormatterTest, HashFlag) {
 
   EXPECT_EQ("-42.0", format("{0:#}", -42.0));
   EXPECT_EQ("-42.0", format("{0:#}", -42.0l));
+  EXPECT_EQ("4.e+01", format("{:#.0e}", 42.0));
+  EXPECT_EQ("0.", format("{:#.0f}", 0.01));
+  auto s = format("{:#.0f}", 0.5);  // MSVC's printf uses wrong rounding mode.
+  EXPECT_TRUE(s == "0." || s == "1.");
   EXPECT_THROW_MSG(format("{0:#", 'c'), format_error,
                    "missing '}' in format string");
   EXPECT_THROW_MSG(format("{0:#}", 'c'), format_error,
@@ -1095,7 +989,9 @@ TEST(FormatterTest, Width) {
   EXPECT_EQ("    0xcafe", format("{0:10}", reinterpret_cast<void*>(0xcafe)));
   EXPECT_EQ("x          ", format("{0:11}", 'x'));
   EXPECT_EQ("str         ", format("{0:12}", "str"));
+  EXPECT_EQ(fmt::format("{:*^5}", "🤡"), "**🤡**");
 }
+
 template <typename T> inline T const_check(T value) { return value; }
 
 TEST(FormatterTest, RuntimeWidth) {
@@ -1229,6 +1125,8 @@ TEST(FormatterTest, Precision) {
       "000000000000000000000000000000000000000000000000000P+127",
       format("{:.838A}", -2.14001164E+38));
   EXPECT_EQ("123.", format("{:#.0f}", 123.0));
+  EXPECT_EQ("1.23", format("{:.02f}", 1.234));
+  EXPECT_EQ("0.001", format("{:.1g}", 0.001));
 
   EXPECT_THROW_MSG(format("{0:.2}", reinterpret_cast<void*>(0xcafe)),
                    format_error,
@@ -1236,6 +1134,8 @@ TEST(FormatterTest, Precision) {
   EXPECT_THROW_MSG(format("{0:.2f}", reinterpret_cast<void*>(0xcafe)),
                    format_error,
                    "precision not allowed for this argument type");
+  EXPECT_THROW_MSG(format("{:.{}e}", 42.0, fmt::internal::max_value<int>()),
+                   format_error, "number is too big");
 
   EXPECT_EQ("st", format("{0:.2}", "str"));
 }
@@ -1356,7 +1256,7 @@ TEST(FormatterTest, FormatShort) {
 TEST(FormatterTest, FormatInt) {
   EXPECT_THROW_MSG(format("{0:v", 42), format_error,
                    "missing '}' in format string");
-  check_unknown_types(42, "bBdoxXn", "integer");
+  check_unknown_types(42, "bBdoxXnL", "integer");
 }
 
 TEST(FormatterTest, FormatBin) {
@@ -1497,6 +1397,7 @@ TEST(FormatterTest, FormatOct) {
 
 TEST(FormatterTest, FormatIntLocale) {
   EXPECT_EQ("1234", format("{:n}", 1234));
+  EXPECT_EQ("1234", format("{:L}", 1234));
 }
 
 struct ConvertibleToLongLong {
@@ -1591,7 +1492,7 @@ TEST(FormatterTest, FormatLongDouble) {
 }
 
 TEST(FormatterTest, FormatChar) {
-  const char types[] = "cbBdoxXn";
+  const char types[] = "cbBdoxXnL";
   check_unknown_types('a', types, "char");
   EXPECT_EQ("a", format("{0}", 'a'));
   EXPECT_EQ("z", format("{0:c}", 'z'));
@@ -1857,6 +1758,8 @@ TEST(FormatTest, Print) {
   EXPECT_WRITE(stderr, fmt::print(stderr, "Don't {}!", "panic"),
                "Don't panic!");
 #endif
+  // Check that the wide print overload compiles.
+  if (fmt::internal::const_check(false)) fmt::print(L"test");
 }
 
 TEST(FormatTest, Variadic) {
@@ -1872,10 +1775,16 @@ TEST(FormatTest, Dynamic) {
   args.emplace_back(fmt::internal::make_arg<ctx>(1.5f));
 
   std::string result = fmt::vformat(
-      "{} and {} and {}", fmt::basic_format_args<ctx>(
-                              args.data(), static_cast<int>(args.size())));
+      "{} and {} and {}",
+      fmt::basic_format_args<ctx>(args.data(), static_cast<int>(args.size())));
 
   EXPECT_EQ("42 and abc1 and 1.5", result);
+}
+
+TEST(FormatTest, Bytes) {
+  auto s = fmt::format("{:10}", fmt::bytes("ёжик"));
+  EXPECT_EQ("ёжик  ", s);
+  EXPECT_EQ(10, s.size());
 }
 
 TEST(FormatTest, JoinArg) {
@@ -1949,16 +1858,31 @@ TEST(FormatTest, UnpackedArgs) {
 struct string_like {};
 fmt::string_view to_string_view(string_like) { return "foo"; }
 
+constexpr char with_null[3] = {'{', '}', '\0'};
+constexpr char no_null[2] = {'{', '}'};
+
 TEST(FormatTest, CompileTimeString) {
   EXPECT_EQ("42", fmt::format(FMT_STRING("{}"), 42));
   EXPECT_EQ(L"42", fmt::format(FMT_STRING(L"{}"), 42));
   EXPECT_EQ("foo", fmt::format(FMT_STRING("{}"), string_like()));
+  (void)with_null;
+  (void)no_null;
+#if __cplusplus >= 201703L
+  EXPECT_EQ("42", fmt::format(FMT_STRING(with_null), 42));
+  EXPECT_EQ("42", fmt::format(FMT_STRING(no_null), 42));
+#endif
+#if defined(FMT_USE_STRING_VIEW) && __cplusplus >= 201703L
+  EXPECT_EQ("42", fmt::format(FMT_STRING(std::string_view("{}")), 42));
+  EXPECT_EQ(L"42", fmt::format(FMT_STRING(std::wstring_view(L"{}")), 42));
+#endif
 }
 
 TEST(FormatTest, CustomFormatCompileTimeString) {
   EXPECT_EQ("42", fmt::format(FMT_STRING("{}"), Answer()));
   Answer answer;
   EXPECT_EQ("42", fmt::format(FMT_STRING("{}"), answer));
+  char buf[10] = {};
+  fmt::format_to(buf, FMT_STRING("{}"), answer);
   const Answer const_answer = Answer();
   EXPECT_EQ("42", fmt::format(FMT_STRING("{}"), const_answer));
 }
@@ -2183,6 +2107,33 @@ TEST(FormatTest, WideFormatToN) {
   EXPECT_EQ(L"BC x", fmt::wstring_view(buffer, 4));
 }
 
+struct test_output_iterator {
+  char* data;
+
+  using iterator_category = std::output_iterator_tag;
+  using value_type = void;
+  using difference_type = void;
+  using pointer = void;
+  using reference = void;
+
+  test_output_iterator& operator++() {
+    ++data;
+    return *this;
+  }
+  test_output_iterator operator++(int) {
+    auto tmp = *this;
+    ++data;
+    return tmp;
+  }
+  char& operator*() { return *data; }
+};
+
+TEST(FormatTest, FormatToNOutputIterator) {
+  char buf[10] = {};
+  fmt::format_to_n(test_output_iterator{buf}, 10, "{}", 42);
+  EXPECT_STREQ(buf, "42");
+}
+
 #if FMT_USE_CONSTEXPR
 struct test_arg_id_handler {
   enum result { NONE, EMPTY, INDEX, NAME, ERROR };
@@ -2249,7 +2200,7 @@ struct test_format_specs_handler {
         type(other.type) {}
 
   FMT_CONSTEXPR void on_align(fmt::align_t a) { align = a; }
-  FMT_CONSTEXPR void on_fill(char f) { fill = f; }
+  FMT_CONSTEXPR void on_fill(fmt::string_view f) { fill = f[0]; }
   FMT_CONSTEXPR void on_plus() { res = PLUS; }
   FMT_CONSTEXPR void on_minus() { res = MINUS; }
   FMT_CONSTEXPR void on_space() { res = SPACE; }
@@ -2263,9 +2214,7 @@ struct test_format_specs_handler {
 
   FMT_CONSTEXPR void on_precision(int p) { precision = p; }
   FMT_CONSTEXPR void on_dynamic_precision(fmt::internal::auto_id) {}
-  FMT_CONSTEXPR void on_dynamic_precision(int index) {
-    precision_ref = index;
-  }
+  FMT_CONSTEXPR void on_dynamic_precision(int index) { precision_ref = index; }
   FMT_CONSTEXPR void on_dynamic_precision(string_view) {}
 
   FMT_CONSTEXPR void end_precision() {}
@@ -2385,7 +2334,7 @@ TEST(FormatTest, ConstexprDynamicSpecsHandler) {
 template <size_t N>
 FMT_CONSTEXPR test_format_specs_handler check_specs(const char (&s)[N]) {
   fmt::internal::specs_checker<test_format_specs_handler> checker(
-      test_format_specs_handler(), fmt::internal::double_type);
+      test_format_specs_handler(), fmt::internal::type::double_type);
   parse_format_specs(s, s + N, checker);
   return checker;
 }
@@ -2574,48 +2523,8 @@ TEST(FormatTest, FmtStringInTemplate) {
 
 #endif  // FMT_USE_CONSTEXPR
 
-// C++20 feature test, since r346892 Clang considers char8_t a fundamental
-// type in this mode. If this is the case __cpp_char8_t will be defined.
-#ifndef __cpp_char8_t
-// Locally provide type char8_t defined in format.h
-using fmt::char8_t;
-#endif
-
-TEST(FormatTest, ConstructU8StringViewFromCString) {
-  fmt::u8string_view s("ab");
-  EXPECT_EQ(s.size(), 2u);
-  const char8_t* data = s.data();
-  EXPECT_EQ(data[0], 'a');
-  EXPECT_EQ(data[1], 'b');
-}
-
-TEST(FormatTest, ConstructU8StringViewFromDataAndSize) {
-  fmt::u8string_view s("foobar", 3);
-  EXPECT_EQ(s.size(), 3u);
-  const char8_t* data = s.data();
-  EXPECT_EQ(data[0], 'f');
-  EXPECT_EQ(data[1], 'o');
-  EXPECT_EQ(data[2], 'o');
-}
-
-#if FMT_USE_USER_DEFINED_LITERALS
-TEST(FormatTest, U8StringViewLiteral) {
-  using namespace fmt::literals;
-  fmt::u8string_view s = "ab"_u;
-  EXPECT_EQ(s.size(), 2u);
-  const char8_t* data = s.data();
-  EXPECT_EQ(data[0], 'a');
-  EXPECT_EQ(data[1], 'b');
-  EXPECT_EQ(format("{:*^5}"_u, "🤡"_u), "**🤡**"_u);
-}
-#endif
-
-TEST(FormatTest, FormatU8String) {
-  EXPECT_EQ(format(fmt::u8string_view("{}"), 42), fmt::u8string_view("42"));
-}
-
 TEST(FormatTest, EmphasisNonHeaderOnly) {
-  // ensure this compiles even if FMT_HEADER_ONLY is not defined.
+  // Ensure this compiles even if FMT_HEADER_ONLY is not defined.
   EXPECT_EQ(fmt::format(fmt::emphasis::bold, "bold error"),
             "\x1b[1mbold error\x1b[0m");
 }
@@ -2652,12 +2561,20 @@ TEST(FormatTest, FormatCustomChar) {
   EXPECT_EQ(result[0], mychar('x'));
 }
 
+// Convert a char8_t string to std::string. Otherwise GTest will insist on
+// inserting `char8_t` NTBS into a `char` stream which is disabled by P1423.
+template <typename S> std::string from_u8str(const S& str) {
+  return std::string(str.begin(), str.end());
+}
+
 TEST(FormatTest, FormatUTF8Precision) {
-  using str_type = std::basic_string<char8_t>;
-  str_type format(reinterpret_cast<const char8_t*>(u8"{:.4}"));
-  str_type str(reinterpret_cast<const char8_t*>(u8"caf\u00e9s"));  // cafés
+  using str_type = std::basic_string<fmt::internal::char8_type>;
+  str_type format(
+      reinterpret_cast<const fmt::internal::char8_type*>(u8"{:.4}"));
+  str_type str(reinterpret_cast<const fmt::internal::char8_type*>(
+      u8"caf\u00e9s"));  // cafés
   auto result = fmt::format(format, str);
   EXPECT_EQ(fmt::internal::count_code_points(result), 4);
   EXPECT_EQ(result.size(), 5);
-  EXPECT_EQ(result, str.substr(0, 5));
+  EXPECT_EQ(from_u8str(result), from_u8str(str.substr(0, 5)));
 }

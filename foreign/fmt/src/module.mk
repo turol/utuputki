@@ -13,7 +13,7 @@ $(eval $(foreach directory, $(DIRS), $(call directory-module,$(directory)) ))
 
 FILES:= \
 	format.cc \
-	posix.cc \
+	os.cc \
 	# empty line
 
 
