@@ -1,6 +1,6 @@
-commit e7b3b40b5a95bc74b9a7f662830a27c49ffc01b4
-Merge: c6e1e260 c5eafe74
+commit e7452d87783fbf6e9d320d515675e26dfd1271c5
+Merge: 1ecb7884 5f862710
 Author: Niels Lohmann <mail@nlohmann.me>
-Date:   Sun Nov 17 12:21:44 2019 +0100
+Date:   Sun Jun 14 17:44:18 2020 +0200
 
-    Merge branch 'release/3.7.3' into develop
+    Merge branch 'release/3.8.0' into develop
