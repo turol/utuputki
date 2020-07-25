@@ -1,3 +1,17 @@
+7.0.1 - 2020-07-07
+------------------
+
+* Updated the inline version namespace name.
+
+* Worked around a gcc bug in mangling of alias templates
+  (`#1753 <https://github.com/fmtlib/fmt/issues/1753>`_).
+
+* Fixed a linkage error on Windows
+  (`#1757 <https://github.com/fmtlib/fmt/issues/1757>`_).
+  Thanks `@Kurkin (Dmitry Kurkin) <https://github.com/Kurkin>`_.
+
+* Fixed minor issues with the documentation.
+
 7.0.0 - 2020-07-05
 ------------------
 
@@ -126,7 +140,7 @@
                             ^
 
 * Added sentinel support to ``fmt::join``
-  (`#1689 <https://github.com/fmtlib/fmt/pull/1689>`_))
+  (`#1689 <https://github.com/fmtlib/fmt/pull/1689>`_)
 
   .. code:: c++
 
@@ -279,7 +293,7 @@
   Thanks `@gsjaardema (Greg Sjaardema) <https://github.com/gsjaardema>`_,
   `@gabime (Gabi Melman) <https://github.com/gabime>`_,
   `@johnor (Johan) <https://github.com/johnor>`_,
-  `@gabime (Dmitry Kurkin) <https://github.com/Kurkin>`_,
+  `@Kurkin (Dmitry Kurkin) <https://github.com/Kurkin>`_,
   `@invexed (James Beach) <https://github.com/invexed>`_,
   `@peterbell10 <https://github.com/peterbell10>`_,
   `@daixtrose (Markus Werle) <https://github.com/daixtrose>`_,
