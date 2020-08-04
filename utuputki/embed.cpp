@@ -91,28 +91,42 @@ int main(int argc, char *argv[]) {
 
 		std::stringstream s;
 
-		s << fmt::format("static const unsigned char {}[] = {{\n", identifier);
+		s << fmt::format("static const unsigned char {}[] = \n\t\"", identifier);
 
-		const unsigned int perLine = 8;
+		std::vector<char> outBuffer;
+		outBuffer.reserve(contents.size() * 5);
 
 		for (unsigned int i = 0; i < contents.size(); i++) {
-			if (i % perLine == 0) {
-				s << "\t";
+			char c = contents[i];
+			if (c >= 32 && c <= 126 && c != '"' && c != '\\' && c != '?' && c != ':' && c != '%') {
+				outBuffer.push_back(contents[i]);
+			} else if (c == '\n') {
+				outBuffer.push_back('\\');
+				outBuffer.push_back('n');
+			} else if (c == '\r') {
+				outBuffer.push_back('\\');
+				outBuffer.push_back('r');
+			} else if (c == '\t') {
+				outBuffer.push_back('\\');
+				outBuffer.push_back('t');
+			} else if (c == '"') {
+				outBuffer.push_back('\\');
+				outBuffer.push_back('"');
+			} else if (c == '\\') {
+				outBuffer.push_back('\\');
+				outBuffer.push_back('\\');
+			} else {
+				outBuffer.push_back('\\');
+				outBuffer.push_back('0' + ((c & 0700) >> 6));
+				outBuffer.push_back('0' + ((c & 0070) >> 3));
+				outBuffer.push_back('0' + ((c & 0007) >> 0));
 			}
-
-			s << fmt::format("0x{:02x}", static_cast<uint8_t>(contents[i]));
-
-			if (i < contents.size() - 1) {
-				s << ", ";
-			}
-
-			if (i % perLine == (perLine - 1)) {
-				s << "\n";
-		   }
-
 		}
 
-		s << " };\n";
+		outBuffer.push_back('\0');
+		s << outBuffer.data();
+
+		s << "\";\n";
 
 		s << fmt::format("static const size_t {}_length = {};\n", identifier, contents.size());
 
