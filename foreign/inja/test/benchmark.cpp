@@ -3,20 +3,22 @@
 #include "hayai/hayai.hpp"
 #include <inja/inja.hpp>
 
-
 using json = nlohmann::json;
-
 
 inja::Environment env;
 
-json data = {{"name", "Peter"}};
+const std::string test_file_directory {"../test/data/benchmark/"};
 
-std::string string_template {"Lorem {{ name }}! Omnis in aut nobis libero enim. Porro optio ratione molestiae necessitatibus numquam architecto soluta. Magnam minus unde quas {{ name }} aspernatur occaecati et voluptas cupiditate. Assumenda ut alias quam voluptate aut saepe ullam dignissimos. \n Sequi aut autem nihil voluptatem tenetur incidunt. Autem commodi animi rerum. {{ lower(name) }} Mollitia eligendi aut sed rerum veniam. Eum et fugit velit sint ratione voluptatem aliquam. Minima sint consectetur natus modi quis. Animi est nesciunt cupiditate nostrum iure. Voluptatem accusamus vel corporis. \n Debitis {{ name }} sunt est debitis distinctio ut. Provident corrupti nihil velit aut tempora corporis corrupti exercitationem. Praesentium cumque ex est itaque."};
+json small_data = env.load_json(test_file_directory + "small_data.json");
+json large_data = env.load_json(test_file_directory + "large_data.json");
+std::string medium_template = env.load_file(test_file_directory + "medium_template.txt");
+std::string large_template = env.load_file(test_file_directory + "large_template.txt");
 
 
-BENCHMARK(InjaBenchmarker, render, 10, 100) {
-  env.render(string_template, data);
-}
+BENCHMARK(SmallDataMediumTemplate, render, 5, 30) { env.render(medium_template, small_data); }
+BENCHMARK(LargeDataMediumTemplate, render, 5, 15) { env.render(medium_template, large_data); }
+BENCHMARK(LargeDataLargeTemplate, render, 5, 5) { env.render(large_template, large_data); }
+
 
 int main() {
   hayai::ConsoleOutputter consoleOutputter;

@@ -4,10 +4,12 @@
 #define INCLUDE_INJA_TEMPLATE_HPP_
 
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
-#include "bytecode.hpp"
+#include "node.hpp"
+#include "statistics.hpp"
 
 
 namespace inja {
@@ -16,12 +18,22 @@ namespace inja {
  * \brief The main inja Template.
  */
 struct Template {
-  std::vector<Bytecode> bytecodes;
+  BlockNode root;
   std::string content;
+
+  explicit Template() { }
+  explicit Template(const std::string& content): content(content) { }
+
+  /// Return number of variables (total number, not distinct ones) in the template
+  int count_variables() {
+    auto statistic_visitor = StatisticsVisitor();
+    root.accept(statistic_visitor);
+    return statistic_visitor.variable_counter;
+  }
 };
 
 using TemplateStorage = std::map<std::string, Template>;
 
-}  // namespace inja
+} // namespace inja
 
-#endif  // INCLUDE_INJA_TEMPLATE_HPP_
+#endif // INCLUDE_INJA_TEMPLATE_HPP_

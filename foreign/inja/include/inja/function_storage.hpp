@@ -1,79 +1,137 @@
-// Copyright (c) 2019 Pantor. All rights reserved.
+// Copyright (c) 2020 Pantor. All rights reserved.
 
 #ifndef INCLUDE_INJA_FUNCTION_STORAGE_HPP_
 #define INCLUDE_INJA_FUNCTION_STORAGE_HPP_
 
 #include <vector>
 
-#include "bytecode.hpp"
 #include "string_view.hpp"
-
 
 namespace inja {
 
 using json = nlohmann::json;
 
-using Arguments = std::vector<const json*>;
-using CallbackFunction = std::function<json(Arguments& args)>;
+using Arguments = std::vector<const json *>;
+using CallbackFunction = std::function<json(Arguments &args)>;
 
 /*!
  * \brief Class for builtin functions and user-defined callbacks.
  */
 class FunctionStorage {
- public:
-  void add_builtin(nonstd::string_view name, unsigned int num_args, Bytecode::Op op) {
-    auto& data = get_or_new(name, num_args);
-    data.op = op;
-  }
-
-  void add_callback(nonstd::string_view name, unsigned int num_args, const CallbackFunction& function) {
-    auto& data = get_or_new(name, num_args);
-    data.function = function;
-  }
-
-  Bytecode::Op find_builtin(nonstd::string_view name, unsigned int num_args) const {
-    if (auto ptr = get(name, num_args)) {
-      return ptr->op;
-    }
-    return Bytecode::Op::Nop;
-  }
-
-  CallbackFunction find_callback(nonstd::string_view name, unsigned int num_args) const {
-    if (auto ptr = get(name, num_args)) {
-      return ptr->function;
-    }
-    return nullptr;
-  }
-
- private:
-  struct FunctionData {
-    unsigned int num_args {0};
-    Bytecode::Op op {Bytecode::Op::Nop}; // for builtins
-    CallbackFunction function; // for callbacks
+public:
+  enum class Operation {
+    Not,
+    And,
+    Or,
+    In,
+    Equal,
+    NotEqual,
+    Greater,
+    GreaterEqual,
+    Less,
+    LessEqual,
+    Add,
+    Subtract,
+    Multiplication,
+    Division,
+    Power,
+    Modulo,
+    AtId,
+    At,
+    Default,
+    DivisibleBy,
+    Even,
+    Exists,
+    ExistsInObject,
+    First,
+    Float,
+    Int,
+    IsArray,
+    IsBoolean,
+    IsFloat,
+    IsInteger,
+    IsNumber,
+    IsObject,
+    IsString,
+    Last,
+    Length,
+    Lower,
+    Max,
+    Min,
+    Odd,
+    Range,
+    Round,
+    Sort,
+    Upper,
+    Callback,
+    ParenLeft,
+    ParenRight,
+    None,
   };
 
-  FunctionData& get_or_new(nonstd::string_view name, unsigned int num_args) {
-    auto &vec = m_map[static_cast<std::string>(name)];
-    for (auto &i: vec) {
-      if (i.num_args == num_args) return i;
-    }
-    vec.emplace_back();
-    vec.back().num_args = num_args;
-    return vec.back();
+  const int VARIADIC {-1};
+
+  struct FunctionData {
+    Operation operation;
+
+    CallbackFunction callback;
+  };
+
+  std::map<std::pair<std::string, int>, FunctionData> function_storage = {
+    {std::make_pair("at", 2), FunctionData { Operation::At }},
+    {std::make_pair("default", 2), FunctionData { Operation::Default }},
+    {std::make_pair("divisibleBy", 2), FunctionData { Operation::DivisibleBy }},
+    {std::make_pair("even", 1), FunctionData { Operation::Even }},
+    {std::make_pair("exists", 1), FunctionData { Operation::Exists }},
+    {std::make_pair("existsIn", 2), FunctionData { Operation::ExistsInObject }},
+    {std::make_pair("first", 1), FunctionData { Operation::First }},
+    {std::make_pair("float", 1), FunctionData { Operation::Float }},
+    {std::make_pair("int", 1), FunctionData { Operation::Int }},
+    {std::make_pair("isArray", 1), FunctionData { Operation::IsArray }},
+    {std::make_pair("isBoolean", 1), FunctionData { Operation::IsBoolean }},
+    {std::make_pair("isFloat", 1), FunctionData { Operation::IsFloat }},
+    {std::make_pair("isInteger", 1), FunctionData { Operation::IsInteger }},
+    {std::make_pair("isNumber", 1), FunctionData { Operation::IsNumber }},
+    {std::make_pair("isObject", 1), FunctionData { Operation::IsObject }},
+    {std::make_pair("isString", 1), FunctionData { Operation::IsString }},
+    {std::make_pair("last", 1), FunctionData { Operation::Last }},
+    {std::make_pair("length", 1), FunctionData { Operation::Length }},
+    {std::make_pair("lower", 1), FunctionData { Operation::Lower }},
+    {std::make_pair("max", 1), FunctionData { Operation::Max }},
+    {std::make_pair("min", 1), FunctionData { Operation::Min }},
+    {std::make_pair("odd", 1), FunctionData { Operation::Odd }},
+    {std::make_pair("range", 1), FunctionData { Operation::Range }},
+    {std::make_pair("round", 2), FunctionData { Operation::Round }},
+    {std::make_pair("sort", 1), FunctionData { Operation::Sort }},
+    {std::make_pair("upper", 1), FunctionData { Operation::Upper }},
+  };
+
+public:
+  void add_builtin(nonstd::string_view name, int num_args, Operation op) {
+    function_storage.emplace(std::make_pair(static_cast<std::string>(name), num_args), FunctionData { op });
   }
 
-  const FunctionData* get(nonstd::string_view name, unsigned int num_args) const {
-    auto it = m_map.find(static_cast<std::string>(name));
-    if (it == m_map.end()) return nullptr;
-    for (auto &&i: it->second) {
-      if (i.num_args == num_args) return &i;
-    }
-    return nullptr;
+  void add_callback(nonstd::string_view name, int num_args, const CallbackFunction &callback) {
+    function_storage.emplace(std::make_pair(static_cast<std::string>(name), num_args), FunctionData { Operation::Callback, callback });
   }
 
-  std::map<std::string, std::vector<FunctionData>> m_map;
+  FunctionData find_function(nonstd::string_view name, int num_args) const {
+    auto it = function_storage.find(std::make_pair(static_cast<std::string>(name), num_args));
+    if (it != function_storage.end()) {
+      return it->second;
+
+    // Find variadic function
+    } else if (num_args > 0) {
+      it = function_storage.find(std::make_pair(static_cast<std::string>(name), VARIADIC));
+      if (it != function_storage.end()) {
+        return it->second;
+      }
+    }
+
+    return { Operation::None };
+  }
 };
 
-}
+} // namespace inja
 
-#endif  // INCLUDE_INJA_FUNCTION_STORAGE_HPP_
+#endif // INCLUDE_INJA_FUNCTION_STORAGE_HPP_

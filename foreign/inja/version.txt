@@ -1,6 +1,5 @@
-commit 652e378dd9bd80cc592aaed61773ea001d994eaf
-Merge: aad2cc4 c36cbac
+commit 02394683b151cdb520c8fb636f3bda77ed4f965d
 Author: pantor <lars.berscheid@online.de>
-Date:   Fri Dec 27 11:37:01 2019 +0100
+Date:   Sun Jul 26 13:16:45 2020 +0200
 
-    Merge branch 'master' of https://github.com/pantor/inja
+    fix single include

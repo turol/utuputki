@@ -1,13 +1,14 @@
 cmake_minimum_required(VERSION 3.5)
 
 
-project(inja LANGUAGES CXX VERSION 2.2.0)
+project(inja LANGUAGES CXX VERSION 3.0.0)
 
 
 option(INJA_USE_EMBEDDED_JSON "Use the shipped json header if not available on the system" ON)
 option(INJA_INSTALL "Generate install targets for inja" ON)
 option(INJA_EXPORT "Export the current build tree to the package registry" ON)
 option(BUILD_TESTING "Build unit tests" ON)
+option(INJA_BUILD_TESTS "Build unit tests when BUILD_TESTING is enabled." ON)
 option(BUILD_BENCHMARK "Build benchmark" ON)
 option(COVERALLS "Generate coveralls data" OFF)
 
@@ -69,16 +70,13 @@ endif()
 target_link_libraries(inja INTERFACE ${INJA_SELECTED_JSON_LIBRARY})
 
 execute_process(COMMAND scripts/update_single_include.sh WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+# CMake: add_custom_command
 
 
-if(BUILD_TESTING)
+if(BUILD_TESTING AND INJA_BUILD_TESTS)
   enable_testing()
 
-  add_executable(inja_test
-    test/unit.cpp
-    test/unit-files.cpp
-    test/unit-renderer.cpp
-  )
+  add_executable(inja_test test/test.cpp)
   target_link_libraries(inja_test PRIVATE inja)
 
   add_test(inja_test ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/inja_test)
@@ -88,11 +86,7 @@ if(BUILD_TESTING)
   target_compile_features(single_inja INTERFACE cxx_std_11)
   target_include_directories(single_inja INTERFACE single_include include third_party/include)
 
-  add_executable(single_inja_test
-    test/unit.cpp
-    test/unit-files.cpp
-    test/unit-renderer.cpp
-  )
+  add_executable(single_inja_test test/test.cpp)
   target_link_libraries(single_inja_test PRIVATE single_inja)
 
   add_test(single_inja_test ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/single_inja_test)

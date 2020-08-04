@@ -8,20 +8,17 @@
 
 #include "string_view.hpp"
 
-
 namespace inja {
-
-enum class ElementNotation {
-  Dot,
-  Pointer
-};
 
 /*!
  * \brief Class for lexer configuration.
  */
 struct LexerConfig {
   std::string statement_open {"{%"};
+  std::string statement_open_no_lstrip {"{%+"};
+  std::string statement_open_force_lstrip {"{%-"};
   std::string statement_close {"%}"};
+  std::string statement_close_force_rstrip {"-%}"};
   std::string line_statement {"##"};
   std::string expression_open {"{{"};
   std::string expression_close {"}}"};
@@ -40,6 +37,12 @@ struct LexerConfig {
     if (open_chars.find(statement_open[0]) == std::string::npos) {
       open_chars += statement_open[0];
     }
+    if (open_chars.find(statement_open_no_lstrip[0]) == std::string::npos) {
+      open_chars += statement_open_no_lstrip[0];
+    }
+    if (open_chars.find(statement_open_force_lstrip[0]) == std::string::npos) {
+      open_chars += statement_open_force_lstrip[0];
+    }
     if (open_chars.find(expression_open[0]) == std::string::npos) {
       open_chars += expression_open[0];
     }
@@ -53,9 +56,16 @@ struct LexerConfig {
  * \brief Class for parser configuration.
  */
 struct ParserConfig {
-  ElementNotation notation {ElementNotation::Dot};
+  bool search_included_templates_in_files {true};
 };
 
-}  // namespace inja
+/*!
+ * \brief Class for render configuration.
+ */
+struct RenderConfig {
+  bool throw_at_missing_includes {true};
+};
 
-#endif  // INCLUDE_INJA_CONFIG_HPP_
+} // namespace inja
+
+#endif // INCLUDE_INJA_CONFIG_HPP_

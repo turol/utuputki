@@ -16,10 +16,6 @@
 *.dylib
 *.dll
 
-# Fortran module files
-*.mod
-*.smod
-
 # Compiled Static libraries
 *.lai
 *.la
@@ -43,3 +39,5 @@ dist
 
 doc/html
 doc/latex
+
+examples

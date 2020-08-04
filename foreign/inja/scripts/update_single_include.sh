@@ -1,8 +1,6 @@
-#!/usr/bin/env sh
+#!/bin/bash
 
-if [ "${MESON_SOURCE_ROOT}" != "" ]
-then
-    cd ${MESON_SOURCE_ROOT}
-fi
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+cd $(dirname "${DIR}")
 
-python3 amalgamate/amalgamate.py -c amalgamate/config.json -s include -v yes
+python3 third_party/amalgamate/amalgamate.py -c scripts/amalgamate_config.json -s include -v yes

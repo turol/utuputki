@@ -1,501 +1,532 @@
-// Copyright (c) 2019 Pantor. All rights reserved.
+// Copyright (c) 2020 Pantor. All rights reserved.
 
 #ifndef INCLUDE_INJA_PARSER_HPP_
 #define INCLUDE_INJA_PARSER_HPP_
 
 #include <limits>
+#include <stack>
 #include <string>
-#include <utility> 
+#include <utility>
+#include <queue>
 #include <vector>
 
-#include "bytecode.hpp"
 #include "config.hpp"
+#include "exceptions.hpp"
 #include "function_storage.hpp"
 #include "lexer.hpp"
+#include "node.hpp"
 #include "template.hpp"
 #include "token.hpp"
 #include "utils.hpp"
 
 #include <nlohmann/json.hpp>
 
-
 namespace inja {
-
-class ParserStatic {
-  ParserStatic() {
-    functions.add_builtin("at", 2, Bytecode::Op::At);
-    functions.add_builtin("default", 2, Bytecode::Op::Default);
-    functions.add_builtin("divisibleBy", 2, Bytecode::Op::DivisibleBy);
-    functions.add_builtin("even", 1, Bytecode::Op::Even);
-    functions.add_builtin("first", 1, Bytecode::Op::First);
-    functions.add_builtin("float", 1, Bytecode::Op::Float);
-    functions.add_builtin("int", 1, Bytecode::Op::Int);
-    functions.add_builtin("last", 1, Bytecode::Op::Last);
-    functions.add_builtin("length", 1, Bytecode::Op::Length);
-    functions.add_builtin("lower", 1, Bytecode::Op::Lower);
-    functions.add_builtin("max", 1, Bytecode::Op::Max);
-    functions.add_builtin("min", 1, Bytecode::Op::Min);
-    functions.add_builtin("odd", 1, Bytecode::Op::Odd);
-    functions.add_builtin("range", 1, Bytecode::Op::Range);
-    functions.add_builtin("round", 2, Bytecode::Op::Round);
-    functions.add_builtin("sort", 1, Bytecode::Op::Sort);
-    functions.add_builtin("upper", 1, Bytecode::Op::Upper);
-    functions.add_builtin("exists", 1, Bytecode::Op::Exists);
-    functions.add_builtin("existsIn", 2, Bytecode::Op::ExistsInObject);
-    functions.add_builtin("isBoolean", 1, Bytecode::Op::IsBoolean);
-    functions.add_builtin("isNumber", 1, Bytecode::Op::IsNumber);
-    functions.add_builtin("isInteger", 1, Bytecode::Op::IsInteger);
-    functions.add_builtin("isFloat", 1, Bytecode::Op::IsFloat);
-    functions.add_builtin("isObject", 1, Bytecode::Op::IsObject);
-    functions.add_builtin("isArray", 1, Bytecode::Op::IsArray);
-    functions.add_builtin("isString", 1, Bytecode::Op::IsString);
-  }
-
- public:
-  ParserStatic(const ParserStatic&) = delete;
-  ParserStatic& operator=(const ParserStatic&) = delete;
-
-  static const ParserStatic& get_instance() {
-    static ParserStatic inst;
-    return inst;
-  }
-
-  FunctionStorage functions;
-};
 
 /*!
  * \brief Class for parsing an inja Template.
  */
 class Parser {
- public:
-  explicit Parser(const ParserConfig& parser_config, const LexerConfig& lexer_config, TemplateStorage& included_templates): m_config(parser_config), m_lexer(lexer_config), m_included_templates(included_templates), m_static(ParserStatic::get_instance()) { }
+  const ParserConfig &config;
 
-  bool parse_expression(Template& tmpl) {
-    if (!parse_expression_and(tmpl)) return false;
-    if (m_tok.kind != Token::Kind::Id || m_tok.text != static_cast<decltype(m_tok.text)>("or")) return true;
-    get_next_token();
-    if (!parse_expression_and(tmpl)) return false;
-    append_function(tmpl, Bytecode::Op::Or, 2);
-    return true;
+  Lexer lexer;
+  TemplateStorage &template_storage;
+  const FunctionStorage &function_storage;
+
+  Token tok, peek_tok;
+  bool have_peek_tok {false};
+
+  size_t current_paren_level {0};
+  size_t current_bracket_level {0};
+  size_t current_brace_level {0};
+
+  nonstd::string_view json_literal_start;
+
+  BlockNode *current_block {nullptr};
+  ExpressionListNode *current_expression_list {nullptr};
+  std::stack<std::pair<FunctionNode*, size_t>> function_stack;
+
+  std::stack<std::shared_ptr<FunctionNode>> operator_stack;
+  std::stack<IfStatementNode*> if_statement_stack;
+  std::stack<ForStatementNode*> for_statement_stack;
+
+  void throw_parser_error(const std::string &message) {
+    throw ParserError(message, lexer.current_position());
   }
 
-  bool parse_expression_and(Template& tmpl) {
-    if (!parse_expression_not(tmpl)) return false;
-    if (m_tok.kind != Token::Kind::Id || m_tok.text != static_cast<decltype(m_tok.text)>("and")) return true;
-    get_next_token();
-    if (!parse_expression_not(tmpl)) return false;
-    append_function(tmpl, Bytecode::Op::And, 2);
-    return true;
-  }
-
-  bool parse_expression_not(Template& tmpl) {
-    if (m_tok.kind == Token::Kind::Id && m_tok.text == static_cast<decltype(m_tok.text)>("not")) {
-      get_next_token();
-      if (!parse_expression_not(tmpl)) return false;
-      append_function(tmpl, Bytecode::Op::Not, 1);
-      return true;
+  void get_next_token() {
+    if (have_peek_tok) {
+      tok = peek_tok;
+      have_peek_tok = false;
     } else {
-      return parse_expression_comparison(tmpl);
+      tok = lexer.scan();
     }
   }
 
-  bool parse_expression_comparison(Template& tmpl) {
-    if (!parse_expression_datum(tmpl)) return false;
-    Bytecode::Op op;
-    switch (m_tok.kind) {
-      case Token::Kind::Id:
-        if (m_tok.text == static_cast<decltype(m_tok.text)>("in"))
-          op = Bytecode::Op::In;
-        else
-          return true;
-        break;
-      case Token::Kind::Equal:
-        op = Bytecode::Op::Equal;
-        break;
-      case Token::Kind::GreaterThan:
-        op = Bytecode::Op::Greater;
-        break;
-      case Token::Kind::LessThan:
-        op = Bytecode::Op::Less;
-        break;
-      case Token::Kind::LessEqual:
-        op = Bytecode::Op::LessEqual;
-        break;
-      case Token::Kind::GreaterEqual:
-        op = Bytecode::Op::GreaterEqual;
-        break;
-      case Token::Kind::NotEqual:
-        op = Bytecode::Op::Different;
-        break;
-      default:
-        return true;
+  void get_peek_token() {
+    if (!have_peek_tok) {
+      peek_tok = lexer.scan();
+      have_peek_tok = true;
     }
-    get_next_token();
-    if (!parse_expression_datum(tmpl)) return false;
-    append_function(tmpl, op, 2);
-    return true;
   }
 
-  bool parse_expression_datum(Template& tmpl) {
-    nonstd::string_view json_first;
-    size_t bracket_level = 0;
-    size_t brace_level = 0;
+  void add_json_literal(const char* content_ptr) {
+    nonstd::string_view json_text(json_literal_start.data(), tok.text.data() - json_literal_start.data() + tok.text.size());
+    current_expression_list->rpn_output.emplace_back(std::make_shared<LiteralNode>(json::parse(json_text), json_text.data() - content_ptr));
+  }
 
-    for (;;) {
-      switch (m_tok.kind) {
-        case Token::Kind::LeftParen: {
-          get_next_token();
-          if (!parse_expression(tmpl)) return false;
-          if (m_tok.kind != Token::Kind::RightParen) {
-            inja_throw("parser_error", "unmatched '('");
-          }
-          get_next_token();
-          return true;
+  bool parse_expression(Template &tmpl, Token::Kind closing) {
+    while (tok.kind != closing && tok.kind != Token::Kind::Eof) {
+      // Literals
+      switch (tok.kind) {
+      case Token::Kind::String: {
+        if (current_brace_level == 0 && current_bracket_level == 0) {
+          json_literal_start = tok.text;
+          add_json_literal(tmpl.content.c_str());
         }
-        case Token::Kind::Id:
-          get_peek_token();
-          if (m_peek_tok.kind == Token::Kind::LeftParen) {
-            // function call, parse arguments
-            Token func_token = m_tok;
-            get_next_token();  // id
-            get_next_token();  // leftParen
-            unsigned int num_args = 0;
-            if (m_tok.kind == Token::Kind::RightParen) {
-              // no args
-              get_next_token();
-            } else {
-              for (;;) {
-                if (!parse_expression(tmpl)) {
-                  inja_throw("parser_error", "expected expression, got '" + m_tok.describe() + "'");
-                }
-                num_args += 1;
-                if (m_tok.kind == Token::Kind::RightParen) {
-                  get_next_token();
-                  break;
-                }
-                if (m_tok.kind != Token::Kind::Comma) {
-                  inja_throw("parser_error", "expected ')' or ',', got '" + m_tok.describe() + "'");
-                }
-                get_next_token();
-              }
-            }
 
-            auto op = m_static.functions.find_builtin(func_token.text, num_args);
+      } break;
+      case Token::Kind::Number: {
+        if (current_brace_level == 0 && current_bracket_level == 0) {
+          json_literal_start = tok.text;
+          add_json_literal(tmpl.content.c_str());
+        }
 
-            if (op != Bytecode::Op::Nop) {
-              // swap arguments for default(); see comment in RenderTo()
-              if (op == Bytecode::Op::Default)
-                std::swap(tmpl.bytecodes.back(), *(tmpl.bytecodes.rbegin() + 1));
-              append_function(tmpl, op, num_args);
-              return true;
-            } else {
-              append_callback(tmpl, func_token.text, num_args);
-              return true;
-            }
-          } else if (m_tok.text == static_cast<decltype(m_tok.text)>("true") ||
-              m_tok.text == static_cast<decltype(m_tok.text)>("false") ||
-              m_tok.text == static_cast<decltype(m_tok.text)>("null")) {
-            // true, false, null are json literals
-            if (brace_level == 0 && bracket_level == 0) {
-              json_first = m_tok.text;
-              goto returnJson;
-            }
-            break;
+      } break;
+      case Token::Kind::LeftBracket: {
+        if (current_brace_level == 0 && current_bracket_level == 0) {
+          json_literal_start = tok.text;
+        }
+        current_bracket_level += 1;
+
+      } break;
+      case Token::Kind::LeftBrace: {
+        if (current_brace_level == 0 && current_bracket_level == 0) {
+          json_literal_start = tok.text;
+        }
+        current_brace_level += 1;
+
+      } break;
+      case Token::Kind::RightBracket: {
+        if (current_bracket_level == 0) {
+          throw_parser_error("unexpected ']'");
+        }
+
+        current_bracket_level -= 1;
+        if (current_brace_level == 0 && current_bracket_level == 0) {
+          add_json_literal(tmpl.content.c_str());
+        }
+
+      } break;
+      case Token::Kind::RightBrace: {
+        if (current_brace_level == 0) {
+          throw_parser_error("unexpected '}'");
+        }
+
+        current_brace_level -= 1;
+        if (current_brace_level == 0 && current_bracket_level == 0) {
+          add_json_literal(tmpl.content.c_str());
+        }
+
+      } break;
+      case Token::Kind::Id: {
+        get_peek_token();
+
+        // Json Literal
+        if (tok.text == static_cast<decltype(tok.text)>("true") || tok.text == static_cast<decltype(tok.text)>("false") || tok.text == static_cast<decltype(tok.text)>("null")) {
+          if (current_brace_level == 0 && current_bracket_level == 0) {
+            json_literal_start = tok.text;
+            add_json_literal(tmpl.content.c_str());
+          }
+
+        // Functions
+        } else if (peek_tok.kind == Token::Kind::LeftParen) {
+          operator_stack.emplace(std::make_shared<FunctionNode>(static_cast<std::string>(tok.text), tok.text.data() - tmpl.content.c_str()));
+          function_stack.emplace(operator_stack.top().get(), current_paren_level);
+
+        // Operator
+        } else if (tok.text == "and" || tok.text == "or" || tok.text == "in" || tok.text == "not") {
+          goto parse_operator;
+
+        // Variables
+        } else {
+          current_expression_list->rpn_output.emplace_back(std::make_shared<JsonNode>(static_cast<std::string>(tok.text), tok.text.data() - tmpl.content.c_str()));
+        }
+
+      // Operators
+      } break;
+      case Token::Kind::Equal:
+      case Token::Kind::NotEqual:
+      case Token::Kind::GreaterThan:
+      case Token::Kind::GreaterEqual:
+      case Token::Kind::LessThan:
+      case Token::Kind::LessEqual:
+      case Token::Kind::Plus:
+      case Token::Kind::Minus:
+      case Token::Kind::Times:
+      case Token::Kind::Slash:
+      case Token::Kind::Power:
+      case Token::Kind::Percent:
+      case Token::Kind::Dot: {
+
+  parse_operator:
+        FunctionStorage::Operation operation;
+        switch (tok.kind) {
+        case Token::Kind::Id: {
+          if (tok.text == "and") {
+            operation = FunctionStorage::Operation::And;
+          } else if (tok.text == "or") {
+            operation = FunctionStorage::Operation::Or;
+          } else if (tok.text == "in") {
+            operation = FunctionStorage::Operation::In;
+          } else if (tok.text == "not") {
+            operation = FunctionStorage::Operation::Not;
           } else {
-            // normal literal (json read)
-            tmpl.bytecodes.emplace_back(
-                Bytecode::Op::Push, m_tok.text,
-                m_config.notation == ElementNotation::Pointer ? Bytecode::Flag::ValueLookupPointer : Bytecode::Flag::ValueLookupDot);
-            get_next_token();
-            return true;
+            throw_parser_error("unknown operator in parser.");
           }
-        // json passthrough
-        case Token::Kind::Number:
-        case Token::Kind::String:
-          if (brace_level == 0 && bracket_level == 0) {
-            json_first = m_tok.text;
-            goto returnJson;
+        } break;
+        case Token::Kind::Equal: {
+          operation = FunctionStorage::Operation::Equal;
+        } break;
+        case Token::Kind::NotEqual: {
+          operation = FunctionStorage::Operation::NotEqual;
+        } break;
+        case Token::Kind::GreaterThan: {
+          operation = FunctionStorage::Operation::Greater;
+        } break;
+        case Token::Kind::GreaterEqual: {
+          operation = FunctionStorage::Operation::GreaterEqual;
+        } break;
+        case Token::Kind::LessThan: {
+          operation = FunctionStorage::Operation::Less;
+        } break;
+        case Token::Kind::LessEqual: {
+          operation = FunctionStorage::Operation::LessEqual;
+        } break;
+        case Token::Kind::Plus: {
+          operation = FunctionStorage::Operation::Add;
+        } break;
+        case Token::Kind::Minus: {
+          operation = FunctionStorage::Operation::Subtract;
+        } break;
+        case Token::Kind::Times: {
+          operation = FunctionStorage::Operation::Multiplication;
+        } break;
+        case Token::Kind::Slash: {
+          operation = FunctionStorage::Operation::Division;
+        } break;
+        case Token::Kind::Power: {
+          operation = FunctionStorage::Operation::Power;
+        } break;
+        case Token::Kind::Percent: {
+          operation = FunctionStorage::Operation::Modulo;
+        } break;
+        case Token::Kind::Dot: {
+          operation = FunctionStorage::Operation::AtId;
+        } break;
+        default: {
+          throw_parser_error("unknown operator in parser.");
+        }
+        }
+        auto function_node = std::make_shared<FunctionNode>(operation, tok.text.data() - tmpl.content.c_str());
+
+        while (!operator_stack.empty() && ((operator_stack.top()->precedence > function_node->precedence) || (operator_stack.top()->precedence == function_node->precedence && function_node->associativity == FunctionNode::Associativity::Left)) && (operator_stack.top()->operation != FunctionStorage::Operation::ParenLeft)) {
+          current_expression_list->rpn_output.emplace_back(operator_stack.top());
+          operator_stack.pop();
+        }
+
+        operator_stack.emplace(function_node);
+
+      } break;
+      case Token::Kind::Comma: {
+        if (current_brace_level == 0 && current_bracket_level == 0) {
+          if (function_stack.empty()) {
+            throw_parser_error("unexpected ','");
           }
-          break;
-        case Token::Kind::Comma:
-        case Token::Kind::Colon:
-          if (brace_level == 0 && bracket_level == 0) {
-            inja_throw("parser_error", "unexpected token '" + m_tok.describe() + "'");
+
+          function_stack.top().first->number_args += 1;
+        }
+
+      } break;
+      case Token::Kind::Colon: {
+        if (current_brace_level == 0 && current_bracket_level == 0) {
+          throw_parser_error("unexpected ':'");
+        }
+
+      } break;
+      case Token::Kind::LeftParen: {
+        current_paren_level += 1;
+        operator_stack.emplace(std::make_shared<FunctionNode>(FunctionStorage::Operation::ParenLeft, tok.text.data() - tmpl.content.c_str()));
+
+        get_peek_token();
+        if (peek_tok.kind == Token::Kind::RightParen) {
+          if (!function_stack.empty() && function_stack.top().second == current_paren_level - 1) {
+            function_stack.top().first->number_args = 0;
           }
-          break;
-        case Token::Kind::LeftBracket:
-          if (brace_level == 0 && bracket_level == 0) {
-            json_first = m_tok.text;
+        }
+
+      } break;
+      case Token::Kind::RightParen: {
+        current_paren_level -= 1;
+        while (operator_stack.top()->operation != FunctionStorage::Operation::ParenLeft) {
+          current_expression_list->rpn_output.emplace_back(operator_stack.top());
+          operator_stack.pop();
+        }
+
+        if (operator_stack.top()->operation == FunctionStorage::Operation::ParenLeft) {
+          operator_stack.pop();
+        }
+
+        if (!function_stack.empty() && function_stack.top().second == current_paren_level) {
+          auto func = function_stack.top().first;
+          auto function_data = function_storage.find_function(func->name, func->number_args);
+          if (function_data.operation == FunctionStorage::Operation::None) {
+            throw_parser_error("unknown function " + func->name);
           }
-          bracket_level += 1;
-          break;
-        case Token::Kind::LeftBrace:
-          if (brace_level == 0 && bracket_level == 0) {
-            json_first = m_tok.text;
+          func->operation = function_data.operation;
+          if (function_data.operation == FunctionStorage::Operation::Callback) {
+            func->callback = function_data.callback;
           }
-          brace_level += 1;
-          break;
-        case Token::Kind::RightBracket:
-          if (bracket_level == 0) {
-            inja_throw("parser_error", "unexpected ']'");
-          }
-          --bracket_level;
-          if (brace_level == 0 && bracket_level == 0) goto returnJson;
-          break;
-        case Token::Kind::RightBrace:
-          if (brace_level == 0) {
-            inja_throw("parser_error", "unexpected '}'");
-          }
-          --brace_level;
-          if (brace_level == 0 && bracket_level == 0) goto returnJson;
-          break;
-        default:
-          if (brace_level != 0) {
-            inja_throw("parser_error", "unmatched '{'");
-          }
-          if (bracket_level != 0) {
-            inja_throw("parser_error", "unmatched '['");
-          }
-          return false;
+
+          function_stack.pop();
+        }
+      }
+      default:
+        break;
       }
 
       get_next_token();
     }
 
-  returnJson:
-    // bridge across all intermediate tokens
-    nonstd::string_view json_text(json_first.data(), m_tok.text.data() - json_first.data() + m_tok.text.size());
-    tmpl.bytecodes.emplace_back(Bytecode::Op::Push, json::parse(json_text), Bytecode::Flag::ValueImmediate);
-    get_next_token();
+    while (!operator_stack.empty()) {
+      current_expression_list->rpn_output.emplace_back(operator_stack.top());
+      operator_stack.pop();
+    }
+
     return true;
   }
 
-  bool parse_statement(Template& tmpl, nonstd::string_view path) {
-    if (m_tok.kind != Token::Kind::Id) return false;
+  bool parse_statement(Template &tmpl, Token::Kind closing, nonstd::string_view path) {
+    if (tok.kind != Token::Kind::Id) {
+      return false;
+    }
 
-    if (m_tok.text == static_cast<decltype(m_tok.text)>("if")) {
+    if (tok.text == static_cast<decltype(tok.text)>("if")) {
       get_next_token();
 
-      // evaluate expression
-      if (!parse_expression(tmpl)) return false;
+      auto if_statement_node = std::make_shared<IfStatementNode>(tok.text.data() - tmpl.content.c_str());
+      current_block->nodes.emplace_back(if_statement_node);
+      if_statement_node->parent = current_block;
+      if_statement_stack.emplace(if_statement_node.get());
+      current_block = &if_statement_node->true_statement;
+      current_expression_list = &if_statement_node->condition;
 
-      // start a new if block on if stack
-      m_if_stack.emplace_back(static_cast<decltype(m_if_stack)::value_type::jump_t>(tmpl.bytecodes.size()));
-
-      // conditional jump; destination will be filled in by else or endif
-      tmpl.bytecodes.emplace_back(Bytecode::Op::ConditionalJump);
-    } else if (m_tok.text == static_cast<decltype(m_tok.text)>("endif")) {
-      if (m_if_stack.empty()) {
-        inja_throw("parser_error", "endif without matching if");
+      if (!parse_expression(tmpl, closing)) {
+        return false;
       }
-      auto& if_data = m_if_stack.back();
+
+    } else if (tok.text == static_cast<decltype(tok.text)>("else")) {
+      if (if_statement_stack.empty()) {
+        throw_parser_error("else without matching if");
+      }
+      auto &if_statement_data = if_statement_stack.top();
       get_next_token();
 
-      // previous conditional jump jumps here
-      if (if_data.prev_cond_jump != std::numeric_limits<unsigned int>::max()) {
-        tmpl.bytecodes[if_data.prev_cond_jump].args = tmpl.bytecodes.size();
-      }
+      if_statement_data->has_false_statement = true;
+      current_block = &if_statement_data->false_statement;
 
-      // update all previous unconditional jumps to here
-      for (unsigned int i: if_data.uncond_jumps) {
-        tmpl.bytecodes[i].args = tmpl.bytecodes.size();
-      }
-
-      // pop if stack
-      m_if_stack.pop_back();
-    } else if (m_tok.text == static_cast<decltype(m_tok.text)>("else")) {
-      if (m_if_stack.empty())
-        inja_throw("parser_error", "else without matching if");
-      auto& if_data = m_if_stack.back();
-      get_next_token();
-
-      // end previous block with unconditional jump to endif; destination will be
-      // filled in by endif
-      if_data.uncond_jumps.push_back(tmpl.bytecodes.size());
-      tmpl.bytecodes.emplace_back(Bytecode::Op::Jump);
-
-      // previous conditional jump jumps here
-      tmpl.bytecodes[if_data.prev_cond_jump].args = tmpl.bytecodes.size();
-      if_data.prev_cond_jump = std::numeric_limits<unsigned int>::max();
-
-      // chained else if
-      if (m_tok.kind == Token::Kind::Id && m_tok.text == static_cast<decltype(m_tok.text)>("if")) {
+      // Chained else if
+      if (tok.kind == Token::Kind::Id && tok.text == static_cast<decltype(tok.text)>("if")) {
         get_next_token();
 
-        // evaluate expression
-        if (!parse_expression(tmpl)) return false;
+        auto if_statement_node = std::make_shared<IfStatementNode>(true, tok.text.data() - tmpl.content.c_str());
+        current_block->nodes.emplace_back(if_statement_node);
+        if_statement_node->parent = current_block;
+        if_statement_stack.emplace(if_statement_node.get());
+        current_block = &if_statement_node->true_statement;
+        current_expression_list = &if_statement_node->condition;
 
-        // update "previous jump"
-        if_data.prev_cond_jump = tmpl.bytecodes.size();
-
-        // conditional jump; destination will be filled in by else or endif
-        tmpl.bytecodes.emplace_back(Bytecode::Op::ConditionalJump);
+        if (!parse_expression(tmpl, closing)) {
+          return false;
+        }
       }
-    } else if (m_tok.text == static_cast<decltype(m_tok.text)>("for")) {
+
+    } else if (tok.text == static_cast<decltype(tok.text)>("endif")) {
+      if (if_statement_stack.empty()) {
+        throw_parser_error("endif without matching if");
+      }
+
+      // Nested if statements
+      while (if_statement_stack.top()->is_nested) {
+        if_statement_stack.pop();
+      }
+
+      auto &if_statement_data = if_statement_stack.top();
+      get_next_token();
+
+      current_block = if_statement_data->parent;
+      if_statement_stack.pop();
+
+    } else if (tok.text == static_cast<decltype(tok.text)>("for")) {
       get_next_token();
 
       // options: for a in arr; for a, b in obj
-      if (m_tok.kind != Token::Kind::Id)
-        inja_throw("parser_error", "expected id, got '" + m_tok.describe() + "'");
-      Token value_token = m_tok;
+      if (tok.kind != Token::Kind::Id) {
+        throw_parser_error("expected id, got '" + tok.describe() + "'");
+      }
+
+      Token value_token = tok;
       get_next_token();
 
-      Token key_token;
-      if (m_tok.kind == Token::Kind::Comma) {
+      // Object type
+      std::shared_ptr<ForStatementNode> for_statement_node;
+      if (tok.kind == Token::Kind::Comma) {
         get_next_token();
-        if (m_tok.kind != Token::Kind::Id)
-          inja_throw("parser_error", "expected id, got '" + m_tok.describe() + "'");
-        key_token = std::move(value_token);
-        value_token = m_tok;
+        if (tok.kind != Token::Kind::Id) {
+          throw_parser_error("expected id, got '" + tok.describe() + "'");
+        }
+
+        Token key_token = std::move(value_token);
+        value_token = tok;
         get_next_token();
+
+        for_statement_node = std::make_shared<ForObjectStatementNode>(key_token.text, value_token.text, tok.text.data() - tmpl.content.c_str());
+
+      // Array type
+      } else {
+        for_statement_node = std::make_shared<ForArrayStatementNode>(value_token.text, tok.text.data() - tmpl.content.c_str());
       }
 
-      if (m_tok.kind != Token::Kind::Id || m_tok.text != static_cast<decltype(m_tok.text)>("in"))
-        inja_throw("parser_error",
-                   "expected 'in', got '" + m_tok.describe() + "'");
+      current_block->nodes.emplace_back(for_statement_node);
+      for_statement_node->parent = current_block;
+      for_statement_stack.emplace(for_statement_node.get());
+      current_block = &for_statement_node->body;
+      current_expression_list = &for_statement_node->condition;
+
+      if (tok.kind != Token::Kind::Id || tok.text != static_cast<decltype(tok.text)>("in")) {
+        throw_parser_error("expected 'in', got '" + tok.describe() + "'");
+      }
       get_next_token();
 
-      if (!parse_expression(tmpl)) return false;
-
-      m_loop_stack.push_back(tmpl.bytecodes.size());
-
-      tmpl.bytecodes.emplace_back(Bytecode::Op::StartLoop);
-      if (!key_token.text.empty()) {
-        tmpl.bytecodes.back().value = key_token.text;
-      }
-      tmpl.bytecodes.back().str = static_cast<std::string>(value_token.text);
-    } else if (m_tok.text == static_cast<decltype(m_tok.text)>("endfor")) {
-      get_next_token();
-      if (m_loop_stack.empty()) {
-        inja_throw("parser_error", "endfor without matching for");
+      if (!parse_expression(tmpl, closing)) {
+        return false;
       }
 
-      // update loop with EndLoop index (for empty case)
-      tmpl.bytecodes[m_loop_stack.back()].args = tmpl.bytecodes.size();
+    } else if (tok.text == static_cast<decltype(tok.text)>("endfor")) {
+      if (for_statement_stack.empty()) {
+        throw_parser_error("endfor without matching for");
+      }
 
-      tmpl.bytecodes.emplace_back(Bytecode::Op::EndLoop);
-      tmpl.bytecodes.back().args = m_loop_stack.back() + 1;  // loop body
-      m_loop_stack.pop_back();
-    } else if (m_tok.text == static_cast<decltype(m_tok.text)>("include")) {
+      auto &for_statement_data = for_statement_stack.top();
       get_next_token();
 
-      if (m_tok.kind != Token::Kind::String) {
-        inja_throw("parser_error", "expected string, got '" + m_tok.describe() + "'");
+      current_block = for_statement_data->parent;
+      for_statement_stack.pop();
+
+    } else if (tok.text == static_cast<decltype(tok.text)>("include")) {
+      get_next_token();
+
+      if (tok.kind != Token::Kind::String) {
+        throw_parser_error("expected string, got '" + tok.describe() + "'");
       }
 
-      // build the relative path
-      json json_name = json::parse(m_tok.text);
+      // Build the relative path
+      json json_name = json::parse(tok.text);
       std::string pathname = static_cast<std::string>(path);
-      pathname += json_name.get_ref<const std::string&>();
+      pathname += json_name.get_ref<const std::string &>();
       if (pathname.compare(0, 2, "./") == 0) {
         pathname.erase(0, 2);
       }
       // sys::path::remove_dots(pathname, true, sys::path::Style::posix);
 
-      if (m_included_templates.find(pathname) == m_included_templates.end()) {
-        Template include_template = parse_template(pathname);
-        m_included_templates.emplace(pathname, include_template);
+      if (config.search_included_templates_in_files && template_storage.find(pathname) == template_storage.end()) {
+        auto include_template = Template(load_file(pathname));
+        template_storage.emplace(pathname, include_template);
+        parse_into_template(template_storage[pathname], pathname);
       }
 
-      // generate a reference bytecode
-      tmpl.bytecodes.emplace_back(Bytecode::Op::Include, json(pathname), Bytecode::Flag::ValueImmediate);
+      current_block->nodes.emplace_back(std::make_shared<IncludeStatementNode>(pathname, tok.text.data() - tmpl.content.c_str()));
 
       get_next_token();
+
     } else {
       return false;
     }
     return true;
   }
 
-  void append_function(Template& tmpl, Bytecode::Op op, unsigned int num_args) {
-    // we can merge with back-to-back push
-    if (!tmpl.bytecodes.empty()) {
-      Bytecode& last = tmpl.bytecodes.back();
-      if (last.op == Bytecode::Op::Push) {
-        last.op = op;
-        last.args = num_args;
-        return;
-      }
-    }
-
-    // otherwise just add it to the end
-    tmpl.bytecodes.emplace_back(op, num_args);
-  }
-
-  void append_callback(Template& tmpl, nonstd::string_view name, unsigned int num_args) {
-    // we can merge with back-to-back push value (not lookup)
-    if (!tmpl.bytecodes.empty()) {
-      Bytecode& last = tmpl.bytecodes.back();
-      if (last.op == Bytecode::Op::Push &&
-          (last.flags & Bytecode::Flag::ValueMask) == Bytecode::Flag::ValueImmediate) {
-        last.op = Bytecode::Op::Callback;
-        last.args = num_args;
-        last.str = static_cast<std::string>(name);
-        return;
-      }
-    }
-
-    // otherwise just add it to the end
-    tmpl.bytecodes.emplace_back(Bytecode::Op::Callback, num_args);
-    tmpl.bytecodes.back().str = static_cast<std::string>(name);
-  }
-
-  void parse_into(Template& tmpl, nonstd::string_view path) {
-    m_lexer.start(tmpl.content);
+  void parse_into(Template &tmpl, nonstd::string_view path) {
+    lexer.start(tmpl.content);
+    current_block = &tmpl.root;
 
     for (;;) {
       get_next_token();
-      switch (m_tok.kind) {
-        case Token::Kind::Eof:
-          if (!m_if_stack.empty()) inja_throw("parser_error", "unmatched if");
-          if (!m_loop_stack.empty()) inja_throw("parser_error", "unmatched for");
-          return;
-        case Token::Kind::Text:
-          tmpl.bytecodes.emplace_back(Bytecode::Op::PrintText, m_tok.text, 0u);
-          break;
-        case Token::Kind::StatementOpen:
-          get_next_token();
-          if (!parse_statement(tmpl, path)) {
-            inja_throw("parser_error", "expected statement, got '" + m_tok.describe() + "'");
-          }
-          if (m_tok.kind != Token::Kind::StatementClose) {
-            inja_throw("parser_error", "expected statement close, got '" + m_tok.describe() + "'");
-          }
-          break;
-        case Token::Kind::LineStatementOpen:
-          get_next_token();
-          parse_statement(tmpl, path);
-          if (m_tok.kind != Token::Kind::LineStatementClose &&
-              m_tok.kind != Token::Kind::Eof) {
-            inja_throw("parser_error", "expected line statement close, got '" + m_tok.describe() + "'");
-          }
-          break;
-        case Token::Kind::ExpressionOpen:
-          get_next_token();
-          if (!parse_expression(tmpl)) {
-            inja_throw("parser_error", "expected expression, got '" + m_tok.describe() + "'");
-          }
-          append_function(tmpl, Bytecode::Op::PrintValue, 1);
-          if (m_tok.kind != Token::Kind::ExpressionClose) {
-            inja_throw("parser_error", "expected expression close, got '" + m_tok.describe() + "'");
-          }
-          break;
-        case Token::Kind::CommentOpen:
-          get_next_token();
-          if (m_tok.kind != Token::Kind::CommentClose) {
-            inja_throw("parser_error", "expected comment close, got '" + m_tok.describe() + "'");
-          }
-          break;
-        default:
-          inja_throw("parser_error", "unexpected token '" + m_tok.describe() + "'");
-          break;
+      switch (tok.kind) {
+      case Token::Kind::Eof: {
+        if (!if_statement_stack.empty()) {
+          throw_parser_error("unmatched if");
+        }
+        if (!for_statement_stack.empty()) {
+          throw_parser_error("unmatched for");
+        }
+      } return;
+      case Token::Kind::Text: {
+        current_block->nodes.emplace_back(std::make_shared<TextNode>(tok.text.data() - tmpl.content.c_str(), tok.text.size()));
+      } break;
+      case Token::Kind::StatementOpen: {
+        get_next_token();
+        if (!parse_statement(tmpl, Token::Kind::StatementClose, path)) {
+          throw_parser_error("expected statement, got '" + tok.describe() + "'");
+        }
+        if (tok.kind != Token::Kind::StatementClose) {
+          throw_parser_error("expected statement close, got '" + tok.describe() + "'");
+        }
+      } break;
+      case Token::Kind::LineStatementOpen: {
+        get_next_token();
+        if (!parse_statement(tmpl, Token::Kind::LineStatementClose, path)) {
+          throw_parser_error("expected statement, got '" + tok.describe() + "'");
+        }
+        if (tok.kind != Token::Kind::LineStatementClose && tok.kind != Token::Kind::Eof) {
+          throw_parser_error("expected line statement close, got '" + tok.describe() + "'");
+        }
+      } break;
+      case Token::Kind::ExpressionOpen: {
+        get_next_token();
+
+        auto expression_list_node = std::make_shared<ExpressionListNode>(tok.text.data() - tmpl.content.c_str());
+        current_block->nodes.emplace_back(expression_list_node);
+        current_expression_list = expression_list_node.get();
+
+        if (!parse_expression(tmpl, Token::Kind::ExpressionClose)) {
+          throw_parser_error("expected expression, got '" + tok.describe() + "'");
+        }
+
+        if (tok.kind != Token::Kind::ExpressionClose) {
+          throw_parser_error("expected expression close, got '" + tok.describe() + "'");
+        }
+      } break;
+      case Token::Kind::CommentOpen: {
+        get_next_token();
+        if (tok.kind != Token::Kind::CommentClose) {
+          throw_parser_error("expected comment close, got '" + tok.describe() + "'");
+        }
+      } break;
+      default: {
+        throw_parser_error("unexpected token '" + tok.describe() + "'");
+      } break;
       }
     }
   }
 
+
+public:
+  explicit Parser(const ParserConfig &parser_config, const LexerConfig &lexer_config,
+                  TemplateStorage &template_storage, const FunctionStorage &function_storage)
+      : config(parser_config), lexer(lexer_config), template_storage(template_storage), function_storage(function_storage) { }
+
   Template parse(nonstd::string_view input, nonstd::string_view path) {
-    Template result;
-    result.content = static_cast<std::string>(input);
+    auto result = Template(static_cast<std::string>(input));
     parse_into(result, path);
     return result;
   }
@@ -504,62 +535,22 @@ class Parser {
     return parse(input, "./");
   }
 
-  Template parse_template(nonstd::string_view filename) {
-    Template result;
-    result.content = load_file(filename);
-
+  void parse_into_template(Template& tmpl, nonstd::string_view filename) {
     nonstd::string_view path = filename.substr(0, filename.find_last_of("/\\") + 1);
-      // StringRef path = sys::path::parent_path(filename);
-    Parser(m_config, m_lexer.get_config(), m_included_templates).parse_into(result, path);
-    return result;
+
+    // StringRef path = sys::path::parent_path(filename);
+    auto sub_parser = Parser(config, lexer.get_config(), template_storage, function_storage);
+    sub_parser.parse_into(tmpl, path);
   }
 
   std::string load_file(nonstd::string_view filename) {
-    std::ifstream file = open_file_or_throw(static_cast<std::string>(filename));
+    std::ifstream file;
+    open_file_or_throw(static_cast<std::string>(filename), file);
     std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
     return text;
   }
-
- private:
-  const ParserConfig& m_config;
-  Lexer m_lexer;
-  Token m_tok;
-  Token m_peek_tok;
-  bool m_have_peek_tok {false};
-  TemplateStorage& m_included_templates;
-  const ParserStatic& m_static;
-
-  struct IfData {
-    using jump_t = unsigned int;
-    jump_t prev_cond_jump;
-    std::vector<jump_t> uncond_jumps;
-
-    explicit IfData(jump_t condJump)
-      : prev_cond_jump(condJump)
-    {
-    }
-  };
-
-  std::vector<IfData> m_if_stack;
-  std::vector<unsigned int> m_loop_stack;
-
-  void get_next_token() {
-    if (m_have_peek_tok) {
-      m_tok = m_peek_tok;
-      m_have_peek_tok = false;
-    } else {
-      m_tok = m_lexer.scan();
-    }
-  }
-
-  void get_peek_token() {
-    if (!m_have_peek_tok) {
-      m_peek_tok = m_lexer.scan();
-      m_have_peek_tok = true;
-    }
-  }
 };
 
-}  // namespace inja
+} // namespace inja
 
-#endif  // INCLUDE_INJA_PARSER_HPP_
+#endif // INCLUDE_INJA_PARSER_HPP_

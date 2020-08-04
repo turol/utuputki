@@ -1,17 +1,35 @@
 [<div align="center"><img width="500" src="https://raw.githubusercontent.com/pantor/inja/master/doc/logo.jpg"></div>](https://github.com/pantor/inja/releases)
 
+<p align="center">
+  <a href="https://github.com/pantor/inja/actions">
+    <img src="https://github.com/pantor/inja/workflows/CI/badge.svg" alt="CI Status">
+  </a>
 
-[![Build Status](https://travis-ci.org/pantor/inja.svg?branch=master)](https://travis-ci.org/pantor/inja)
-[![Build status](https://ci.appveyor.com/api/projects/status/qtgniyyg6fn8ich8/branch/master?svg=true)](https://ci.appveyor.com/project/pantor/inja)
-[![Codacy Status](https://api.codacy.com/project/badge/Grade/aa2041f1e6e648ae83945d29cfa0da17)](https://www.codacy.com/app/pantor/inja?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=pantor/inja&amp;utm_campaign=Badge_Grade)
-[![Github Releases](https://img.shields.io/github/release/pantor/inja.svg)](https://github.com/pantor/inja/releases)
-[![Github Issues](https://img.shields.io/github/issues/pantor/inja.svg)](http://github.com/pantor/inja/issues)
-[![GitHub License](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/pantor/inja/master/LICENSE)
+  <a href="https://github.com/pantor/inja/actions">
+    <img src="https://github.com/pantor/inja/workflows/Documentation/badge.svg" alt="Documentation Status">
+  </a>
+
+  <a href="https://www.codacy.com/app/pantor/inja?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=pantor/inja&amp;utm_campaign=Badge_Grade">
+    <img src="https://api.codacy.com/project/badge/Grade/aa2041f1e6e648ae83945d29cfa0da17" alt="Codacy Status">
+  </a>
+
+  <a href="https://github.com/pantor/inja/releases">
+    <img src="https://img.shields.io/github/release/pantor/inja.svg" alt="Github Releases">
+  </a>
+
+  <a href="http://github.com/pantor/inja/issues">
+    <img src="https://img.shields.io/github/issues/pantor/inja.svg" alt="Github Issues">
+  </a>
+
+  <a href="https://raw.githubusercontent.com/pantor/inja/master/LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="GitHub License">
+  </a>
+</p>
 
 
 Inja is a template engine for modern C++, loosely inspired by [jinja](http://jinja.pocoo.org) for python. It has an easy and yet powerful template syntax with all variables, loops, conditions, includes, callbacks, comments you need, nested and combined as you like. Inja uses the wonderful [json](https://github.com/nlohmann/json) library by nlohmann for data input and handling. Most importantly, *inja* needs only two header files, which is (nearly) as trivial as integration in C++ can get. Of course, everything is tested on all relevant compilers. Here is what it looks like:
 
-```c++
+```.cpp
 json data;
 data["name"] = "world";
 
@@ -22,7 +40,7 @@ inja::render("Hello {{ name }}!", data); // Returns "Hello world!"
 
 Inja is a headers only library, which can be downloaded from the [releases](https://github.com/pantor/inja/releases) or directly from the `include/` or `single_include/` folder. Inja uses `nlohmann/json.hpp` as its single dependency, so make sure it can be included from `inja.hpp`. json can be downloaded [here](https://github.com/nlohmann/json/releases). Then integration is as easy as:
 
-```c++
+```.cpp
 #include <inja.hpp>
 
 // Just for convenience
@@ -34,7 +52,7 @@ If you are using the [Meson Build System](http://mesonbuild.com), then you can w
 
 If you are using [Conan](https://conan.io) to manage your dependencies, have a look at [this repository](https://github.com/DEGoodmanWilson/conan-inja). Please file issues [here](https://github.com/DEGoodmanWilson/conan-inja/issues) if you experience problems with the packages.
 
-You can also integrate inja in your project using [Hunter](https://github.com/ruslo/hunter), a package manager for C++.
+You can also integrate inja in your project using [Hunter](https://github.com/cpp-pm/hunter), a package manager for C++.
 
 If you are using [vcpkg](https://github.com/Microsoft/vcpkg) on your project for external dependencies, then you can use the [inja package](https://github.com/Microsoft/vcpkg/tree/master/ports/inja). Please see the vcpkg project for any issues regarding the packaging.
 
@@ -49,7 +67,7 @@ This tutorial will give you an idea how to use inja. It will explain the most im
 
 The basic template rendering takes a template as a `std::string` and a `json` object for all data. It returns the rendered template as an `std::string`.
 
-```c++
+```.cpp
 json data;
 data["name"] = "world";
 
@@ -58,7 +76,7 @@ render_to(std::cout, "Hello {{ name }}!", data); // Prints "Hello world!"
 ```
 
 For more advanced usage, an environment is recommended.
-```c++
+```.cpp
 Environment env;
 
 // Render a string with json data
@@ -81,7 +99,7 @@ env.write_with_json_file("./templates/greeting.txt", "./data.json", "./result.tx
 ```
 
 The environment class can be configured to your needs.
-```c++
+```.cpp
 // With default settings
 Environment env_default;
 
@@ -90,10 +108,6 @@ Environment env_1 {"../path/templates/"};
 
 // With separate input and output path
 Environment env_2 {"../path/templates/", "../path/results/"};
-
-// Choose between dot notation (like Jinja2) and JSON pointer to access elements
-env.set_element_notation(ElementNotation::Dot); // (default) e.g. time.start
-env.set_element_notation(ElementNotation::Pointer); // e.g. time/start
 
 // With other opening and closing strings (here the defaults)
 env.set_expression("{{", "}}"); // Expressions
@@ -105,7 +119,7 @@ env.set_line_statement("##"); // Line statements ## (just an opener)
 ### Variables
 
 Variables are rendered within the `{{ ... }}` expressions.
-```c++
+```.cpp
 json data;
 data["neighbour"] = "Peter";
 data["guests"] = {"Jeff", "Tom", "Patrick"};
@@ -116,18 +130,18 @@ data["time"]["end"] = 22;
 render("{{ guests.1 }}", data); // "Tom"
 
 // Objects
-render("{{ time.start }} to {{ time.end }}pm", data); // "16 to 22pm"
+render("{{ time.start }} to {{ time.end + 1 }}pm", data); // "16 to 23pm"
 ```
 In general, the variables can be fetched using the [JSON Pointer](https://tools.ietf.org/html/rfc6901) syntax. For convenience, the leading `/` can be omitted. If no variable is found, valid JSON is printed directly, otherwise an error is thrown.
 
 
 ### Statements
 
-Statements can be written either with the `{% ... %}` syntax or the `##` syntax for entire lines. The most important statements are loops, conditions and file includes. All statements can be nested.
+Statements can be written either with the `{% ... %}` syntax or the `##` syntax for entire lines. Note that `##` needs to start the line without indentation. The most important statements are loops, conditions and file includes. All statements can be nested.
 
 #### Loops
 
-```c++
+```.cpp
 // Combining loops and line statements
 render(R"(Guest List:
 ## for guest in guests
@@ -144,15 +158,15 @@ In a loop, the special variables `loop/index (number)`, `loop/index1 (number)`, 
 #### Conditions
 
 Conditions support the typical if, else if and else statements. Following conditions are for example possible:
-```c++
+```.cpp
 // Standard comparisons with variable
-render("{% if time.hour >= 18 %}…{% endif %}", data); // True
+render("{% if time.hour >= 20 %}…{% else if time.hour >= 18 %}…{% endif %}", data); // True
 
 // Variable in list
 render("{% if neighbour in guests %}…{% endif %}", data); // True
 
 // Logical operations
-render("{% if guest_count < 5 and all_tired %}…{% endif %}", data); // True
+render("{% if guest_count < (3+2) and all_tired %}…{% else %}…{% endif %}", data); // True
 
 // Negations
 render("{% if not guest_count %}…{% endif %}", data); // True
@@ -160,21 +174,26 @@ render("{% if not guest_count %}…{% endif %}", data); // True
 
 #### Includes
 
-You can either include other template files or already parsed templates.
-```c++
-// Other template files are included relative from the current file location
-render("{% include \"footer.html\" %}", data);
-
+You can either include other in-memory templates or from the file system.
+```.cpp
 // To include in-memory templates, add them to the environment first
 inja::Template content_template = env.parse("Hello {{ neighbour }}!");
 env.include_template("content", content_template);
 env.render("Content: {% include \"content\" %}", data); // "Content: Hello Peter!"
+
+// Other template files are included relative from the current file location
+render("{% include \"footer.html\" %}", data);
+
+// You can disable to search for templates in the file system via
+env.set_search_included_templates_in_files(false);
 ```
+
+Inja will throw an `inja::RenderError` if an included file is not found. To disable this error, you can call `env.set_throw_at_missing_includes(false);`.
 
 ### Functions
 
 A few functions are implemented within the inja template syntax. They can be called with
-```c++
+```.cpp
 // Upper and lower function, for string cases
 render("Hello {{ upper(neighbour) }}!", data); // "Hello PETER!"
 render("Hello {{ lower(neighbour) }}!", data); // "Hello peter!"
@@ -229,27 +248,33 @@ render("{{ isArray(guests) }}", data); // "true"
 
 ### Whitespace Control
 
-In the default configuration, no whitespace is removed while rendering the file. To support a more readable template style, you can configure the environment to control whitespaces before and after a statement automatically. While enabling `set_trim` removes the first newline after a statement, `set_lstrip` strips tabs and spaces from the beginning of a line to the start of a block.
+In the default configuration, no whitespace is removed while rendering the file. To support a more readable template style, you can configure the environment to control whitespaces before and after a statement automatically. While enabling `set_trim_blocks` removes the first newline after a statement, `set_lstrip_blocks` strips tabs and spaces from the beginning of a line to the start of a block.
 
-```c++
+```.cpp
 Environment env;
-env.set_trim(true);
-env.set_lstrip(true);
+env.set_trim_blocks(true);
+env.set_lstrip_blocks(true);
 ```
 
-With both `trim` and `lstrip` enabled, you can put statements on their own lines.
+With both `trim_blocks` and `lstrip_blocks` enabled, you can put statements on their own lines. Furthermore, you can also strip whitespaces by hand. If you add a minus sign (`-`) to the start or end of a statement, the whitespaces before or after that block will be removed:
+
+```.cpp
+render("{% if neighbour in guests -%}   I was there{% endif -%}   !", data); // Renders without any whitespaces
+```
+
+Stripping behind a statement also remove any newlines.
 
 ### Callbacks
 
-You can create your own and more complex functions with callbacks.
-```c++
+You can create your own and more complex functions with callbacks. These are implemented with `std::function`, so you can for example use C++ lambdas. Inja `Arguments` are a vector of json pointers.
+```.cpp
 Environment env;
 
 /*
  * Callbacks are defined by its:
- * - name
- * - number of arguments
- * - callback function. Implemented with std::function, you can for example use lambdas.
+ * - name,
+ * - (optional) number of arguments,
+ * - callback function.
  */
 env.add_callback("double", 1, [](Arguments& args) {
 	int number = args.at(0)->get<int>(); // Adapt the index and type of the argument
@@ -258,6 +283,14 @@ env.add_callback("double", 1, [](Arguments& args) {
 
 // You can then use a callback like a regular function
 env.render("{{ double(16) }}", data); // "32"
+
+// Inja falls back to variadic callbacks if the number of expected arguments is omitted.
+env.add_callback("argmax", [](Arguments& args) {
+  auto result = std::max_element(args.begin(), args.end(), [](const json* a, const json* b) { return *a < *b;});
+  return std::distance(args.begin(), result);
+});
+env.render("{{ argmax(4, 2, 6) }}", data); // "2"
+env.render("{{ argmax(0, 2, 6, 8, 3) }}", data); // "3"
 
 // A callback without argument can be used like a dynamic variable:
 std::string greet = "Hello";
@@ -270,16 +303,17 @@ env.render("{{ double-greetings }}", data); // "Hello Hello!"
 ### Comments
 
 Comments can be written with the `{# ... #}` syntax.
-```c++
+```.cpp
 render("Hello{# Todo #}!", data); // "Hello!"
 ```
-
 
 
 ## Supported compilers
 
 Inja uses `string_view` from C++17, but includes the [polyfill](https://github.com/martinmoene/string-view-lite) from martinmoene. This way, the minimum version is C++11. Currently, the following compilers are tested:
 
-- GCC 5.0 - 8.0 (and possibly later)
-- Clang 5.0 - 6.0 (and possibly later)
-- Microsoft Visual C++ 2015 - 2017 (and possibly later)
+- GCC 4.8 - 9 (and possibly later)
+- Clang 3.5 - 9 (and possibly later)
+- Microsoft Visual C++ 2016 - 2019 (and possibly later)
+
+The unit tests fail to compile with GCC 4.8 but should just work fine. A complete list of supported compiler / os versions can be found in the [CI definition](https://github.com/pantor/inja/blob/master/.github/workflows/ci.yml).
