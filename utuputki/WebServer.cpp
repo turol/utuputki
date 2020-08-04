@@ -683,6 +683,19 @@ struct WebServer::WebServerImpl {
 	Timestamp                                    nextClientCleanup;
 
 
+	const inja::Template                         &getPlaylistTemplate() {
+		return playlistTemplate;
+	}
+
+	const inja::Template                         &getHistoryTemplate() {
+		return historyTemplate;
+	}
+
+	const inja::Template                         &getListMediaTemplate() {
+		return listMediaTemplate;
+	}
+
+
 	WebServerImpl()                                      = delete;
 
 	WebServerImpl(const WebServerImpl &other)            = delete;
