@@ -441,7 +441,7 @@ struct WebServer::WebServerImpl {
 			std::string output;
 
 			Format fmt = getFormatParameter(conn, Format::HTML);
-			std::tie(output, mimeType) = impl_->formatOutput(jsonData, fmt, impl_->historyTemplate);
+			std::tie(output, mimeType) = impl_->formatOutput(jsonData, fmt, impl_->getHistoryTemplate());
 
 			return sendOK(conn, mimeType, output);
 		}
@@ -477,7 +477,7 @@ struct WebServer::WebServerImpl {
 			std::string output;
 
 			Format fmt = getFormatParameter(conn, Format::HTML);
-			std::tie(output, mimeType) = impl_->formatOutput(jsonData, fmt, impl_->listMediaTemplate);
+			std::tie(output, mimeType) = impl_->formatOutput(jsonData, fmt, impl_->getListMediaTemplate());
 
 			return sendOK(conn, mimeType, output);
 		}
@@ -589,7 +589,7 @@ struct WebServer::WebServerImpl {
 			std::string output;
 
 			Format fmt = getFormatParameter(conn, Format::HTML);
-			std::tie(output, mimeType) = impl_->formatOutput(jsonData, fmt, impl_->playlistTemplate);
+			std::tie(output, mimeType) = impl_->formatOutput(jsonData, fmt, impl_->getPlaylistTemplate());
 
 			return sendOK(conn, mimeType, output);
 		}
