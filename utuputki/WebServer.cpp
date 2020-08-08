@@ -229,14 +229,16 @@ struct WebServer::WebServerImpl {
 		const unsigned char  *content;
 		unsigned int         length;
 		MIMEType             mimeType;
+		std::string          filename;
 
 
 	public:
 
-		StaticHandler(const unsigned char *content_, unsigned int length_, MIMEType mimeType_)
+		StaticHandler(const unsigned char *content_, unsigned int length_, MIMEType mimeType_, const std::string &filename_)
 		: content(content_)
 		, length(length_)
 		, mimeType(mimeType_)
+		, filename(filename_)
 		{
 		}
 
@@ -845,8 +847,8 @@ WebServer::WebServerImpl::WebServerImpl(Utuputki &utuputki_, const Config &confi
 , playlistTemplate()
 , historyTemplate()
 , listMediaTemplate()
-, cssHandler(utuputki_css, utuputki_css_length, MIMEType::TextCSS)
-, jsHandler(utuputki_js, utuputki_js_length, MIMEType::TextJavaScript)
+, cssHandler(utuputki_css, utuputki_css_length, MIMEType::TextCSS, "utuputki.css")
+, jsHandler(utuputki_js, utuputki_js_length, MIMEType::TextJavaScript, "utuputki.js")
 , localTimeZone(date::current_zone())
 , clientTimeout(std::chrono::seconds(config.get("webserver", "clientTimeoutSeconds", 600)))
 , nextClientCleanup(Timestamp::clock::now() + clientTimeout)
