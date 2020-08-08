@@ -13,6 +13,7 @@
 
 #include "utuputki/Config.h"
 #include "utuputki/Logger.h"
+#include "utuputki/Utils.h"
 #include "utuputki/Utuputki.h"
 #include "utuputki/WebServer.h"
 
@@ -244,13 +245,39 @@ struct WebServer::WebServerImpl {
 
 
 		bool handleGet(CivetServer * /* server */, struct mg_connection *conn) override final {
-			int retval = mg_send_http_ok(conn, mimeTypeString(mimeType), length);
+			auto length_  = length;
+			auto content_ = content;
+
+#ifdef OVERRIDE_TEMPLATES
+			// check if should override with local
+			struct stat statbuf;
+			memset(&statbuf, 0, sizeof(statbuf));
+
+			int ret = stat(filename.c_str(), &statbuf);
+			std::vector<char> overrideContents;
+			if (ret == 0) {
+				LOG_DEBUG("Overriding template {}", filename);
+				try {
+					overrideContents = readFile(filename);
+					content_ = reinterpret_cast<uint8_t *>(overrideContents.data());
+					length_  = overrideContents.size();
+				} catch (std::exception &e) {
+					LOG_ERROR("Error reading override {}: {}", filename, e.what());
+				} catch (...) {
+					LOG_ERROR("Error reading override {}: unknown error", filename);
+				}
+			}
+
+
+#endif // OVERRIDE_TEMPLATES
+
+			int retval = mg_send_http_ok(conn, mimeTypeString(mimeType), length_);
 			if (retval < 0) {
 				LOG_ERROR("mg_send_http_ok failed: {}", retval);
 				return true;
 			}
 
-			retval = mg_write(conn, content, length);
+			retval = mg_write(conn, content_, length_);
 			if (retval < 0) {
 				LOG_ERROR("mg_write failed: {}", retval);
 				return true;
