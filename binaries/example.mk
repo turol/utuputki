@@ -22,6 +22,9 @@ CFLAGS+=$(shell pkg-config --cflags libvlc)
 CFLAGS+=$(shell pkg-config --cflags python3)
 CFLAGS+=$(shell pkg-config --cflags sqlite3)
 
+# for development
+#CFLAGS+=-DOVERRIDE_TEMPLATES
+
 OPTFLAGS:=-Os
 OPTFLAGS+=-march=native
 # OPTFLAGS+=-ffunction-sections -fdata-sections

@@ -683,6 +683,9 @@ struct WebServer::WebServerImpl {
 	Timestamp                                    nextClientCleanup;
 
 
+#ifdef OVERRIDE_TEMPLATES
+
+
 	const inja::Template                         &getPlaylistTemplate() {
 		return playlistTemplate;
 	}
@@ -694,6 +697,23 @@ struct WebServer::WebServerImpl {
 	const inja::Template                         &getListMediaTemplate() {
 		return listMediaTemplate;
 	}
+
+#else // OVERRIDE_TEMPLATES
+
+	const inja::Template                         &getPlaylistTemplate() {
+		return playlistTemplate;
+	}
+
+	const inja::Template                         &getHistoryTemplate() {
+		return historyTemplate;
+	}
+
+	const inja::Template                         &getListMediaTemplate() {
+		return listMediaTemplate;
+	}
+
+
+#endif // OVERRIDE_TEMPLATES
 
 
 	WebServerImpl()                                      = delete;
