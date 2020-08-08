@@ -9,6 +9,8 @@
 #include <date/tz.h>
 #include <inja/inja.hpp>
 
+#include <sys/stat.h>
+
 #include "utuputki/Config.h"
 #include "utuputki/Logger.h"
 #include "utuputki/Utuputki.h"
@@ -686,8 +688,26 @@ struct WebServer::WebServerImpl {
 #ifdef OVERRIDE_TEMPLATES
 
 
-	inja::Template                               getTemplate(const std::string & /* name */, const inja::Template &defaultTemplate) {
-		// TODO: check file exist, timestamp
+	inja::Template                               getTemplate(const std::string &name, const inja::Template &defaultTemplate) {
+		// check if should override with local
+		struct stat statbuf;
+		memset(&statbuf, 0, sizeof(statbuf));
+
+		int ret = stat(name.c_str(), &statbuf);
+		if (ret == 0) {
+			LOG_DEBUG("Overriding template {}", name);
+			try {
+				inja::Template newTemplate = environment.parse_file(name);
+				// TODO: update the template
+				// TODO: cache the time to avoid unnecessary parse when not changed
+				return newTemplate;
+			} catch (std::exception &e) {
+				LOG_ERROR("Error reading override template {}: {}", name, e.what());
+			} catch (...) {
+				LOG_ERROR("Error reading override template {}: unknown error", name);
+			}
+		}
+
 		return defaultTemplate;
 	}
 
