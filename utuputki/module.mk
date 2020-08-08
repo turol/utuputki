@@ -10,6 +10,7 @@ FILES:= \
 	Logger.cpp \
 	main.cpp \
 	Player.cpp \
+	Utils.cpp \
 	Utuputki.cpp \
 	WebServer.cpp \
 	# empty line
@@ -30,7 +31,7 @@ SRC_$(d):=$(addprefix $(d)/,$(FILES))
 
 
 embed_MODULES:=fmt
-embed_SRC:=$(foreach f, embed.cpp, $(dir)/$(f))
+embed_SRC:=$(foreach f, embed.cpp Utils.cpp, $(dir)/$(f))
 
 
 utuputki_MODULES:=civetweb date fmt libvlcpp python sqlpp11 cxxurl
