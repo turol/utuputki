@@ -686,20 +686,20 @@ struct WebServer::WebServerImpl {
 #ifdef OVERRIDE_TEMPLATES
 
 
-	const inja::Template                         &getTemplate(const std::string & /* name */, const inja::Template &defaultTemplate) {
+	inja::Template                               getTemplate(const std::string & /* name */, const inja::Template &defaultTemplate) {
 		// TODO: check file exist, timestamp
 		return defaultTemplate;
 	}
 
-	const inja::Template                         &getPlaylistTemplate() {
+	inja::Template                               getPlaylistTemplate() {
 		return getTemplate("playlist.template", playlistTemplate);
 	}
 
-	const inja::Template                         &getHistoryTemplate() {
+	inja::Template                               getHistoryTemplate() {
 		return getTemplate("history.template", historyTemplate);
 	}
 
-	const inja::Template                         &getListMediaTemplate() {
+	inja::Template                               getListMediaTemplate() {
 		return getTemplate("listMedia.template", listMediaTemplate);
 	}
 
