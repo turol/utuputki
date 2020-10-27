@@ -8,9 +8,9 @@
   <a href="https://github.com/pantor/inja/actions">
     <img src="https://github.com/pantor/inja/workflows/Documentation/badge.svg" alt="Documentation Status">
   </a>
-
-  <a href="https://www.codacy.com/app/pantor/inja?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=pantor/inja&amp;utm_campaign=Badge_Grade">
-    <img src="https://api.codacy.com/project/badge/Grade/aa2041f1e6e648ae83945d29cfa0da17" alt="Codacy Status">
+  
+  <a href="https://www.codacy.com/manual/pantor/inja?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=pantor/inja&amp;utm_campaign=Badge_Grade">
+    <img src="https://app.codacy.com/project/badge/Grade/211718f7a36541819d1244c0e2ee6f08"/>
   </a>
 
   <a href="https://github.com/pantor/inja/releases">
@@ -26,8 +26,7 @@
   </a>
 </p>
 
-
-Inja is a template engine for modern C++, loosely inspired by [jinja](http://jinja.pocoo.org) for python. It has an easy and yet powerful template syntax with all variables, loops, conditions, includes, callbacks, comments you need, nested and combined as you like. Inja uses the wonderful [json](https://github.com/nlohmann/json) library by nlohmann for data input and handling. Most importantly, *inja* needs only two header files, which is (nearly) as trivial as integration in C++ can get. Of course, everything is tested on all relevant compilers. Here is what it looks like:
+Inja is a template engine for modern C++, loosely inspired by [jinja](http://jinja.pocoo.org) for python. It has an easy and yet powerful template syntax with all variables, loops, conditions, includes, callbacks, and comments you need, nested and combined as you like. Inja uses the wonderful [json](https://github.com/nlohmann/json) library by nlohmann for data input. Most importantly, inja needs only two header files, which is (nearly) as trivial as integration in C++ can get. Of course, everything is tested on all relevant compilers. Here is what it looks like:
 
 ```.cpp
 json data;
@@ -38,7 +37,7 @@ inja::render("Hello {{ name }}!", data); // Returns "Hello world!"
 
 ## Integration
 
-Inja is a headers only library, which can be downloaded from the [releases](https://github.com/pantor/inja/releases) or directly from the `include/` or `single_include/` folder. Inja uses `nlohmann/json.hpp` as its single dependency, so make sure it can be included from `inja.hpp`. json can be downloaded [here](https://github.com/nlohmann/json/releases). Then integration is as easy as:
+Inja is a headers only library, which can be downloaded from the [releases](https://github.com/pantor/inja/releases) or directly from the `include/` or `single_include/` folder. Inja uses `nlohmann/json.hpp` (>= v3.8.0) as its single dependency, so make sure it can be included from `inja.hpp`. json can be downloaded [here](https://github.com/nlohmann/json/releases). Then integration is as easy as:
 
 ```.cpp
 #include <inja.hpp>
@@ -58,6 +57,7 @@ If you are using [vcpkg](https://github.com/Microsoft/vcpkg) on your project for
 
 If you are using [cget](https://cget.readthedocs.io/en/latest/), you can install the latest development version with `cget install pantor/inja`. A specific version can be installed with `cget install pantor/inja@v2.1.0`.
 
+On macOS, you can install inja via [Homebrew](https://formulae.brew.sh/formula/inja#default) and `brew install inja`.
 
 ## Tutorial
 
@@ -72,7 +72,7 @@ json data;
 data["name"] = "world";
 
 render("Hello {{ name }}!", data); // Returns std::string "Hello world!"
-render_to(std::cout, "Hello {{ name }}!", data); // Prints "Hello world!"
+render_to(std::cout, "Hello {{ name }}!", data); // Writes "Hello world!" to stream
 ```
 
 For more advanced usage, an environment is recommended.
@@ -132,8 +132,7 @@ render("{{ guests.1 }}", data); // "Tom"
 // Objects
 render("{{ time.start }} to {{ time.end + 1 }}pm", data); // "16 to 23pm"
 ```
-In general, the variables can be fetched using the [JSON Pointer](https://tools.ietf.org/html/rfc6901) syntax. For convenience, the leading `/` can be omitted. If no variable is found, valid JSON is printed directly, otherwise an error is thrown.
-
+If no variable is found, valid JSON is printed directly, otherwise an `inja::RenderError` is thrown.
 
 ### Statements
 
@@ -188,7 +187,14 @@ render("{% include \"footer.html\" %}", data);
 env.set_search_included_templates_in_files(false);
 ```
 
-Inja will throw an `inja::RenderError` if an included file is not found. To disable this error, you can call `env.set_throw_at_missing_includes(false);`.
+Inja will throw an `inja::RenderError` if an included file is not found. To disable this error, you can call `env.set_throw_at_missing_includes(false)`.
+
+#### Assignments
+
+Variables can also be defined within the template using the set statment.
+```.cpp
+render("{% set new_hour=23 %}{{ new_hour }}pm", data); // "23pm"
+```
 
 ### Functions
 
@@ -256,13 +262,14 @@ env.set_trim_blocks(true);
 env.set_lstrip_blocks(true);
 ```
 
-With both `trim_blocks` and `lstrip_blocks` enabled, you can put statements on their own lines. Furthermore, you can also strip whitespaces by hand. If you add a minus sign (`-`) to the start or end of a statement, the whitespaces before or after that block will be removed:
+With both `trim_blocks` and `lstrip_blocks` enabled, you can put statements on their own lines. Furthermore, you can also strip whitespaces for both statements and expressions by hand. If you add a minus sign (`-`) to the start or end, the whitespaces before or after that block will be removed:
 
 ```.cpp
+render("Hello       {{- name -}}     !", data); // "Hello Inja!"
 render("{% if neighbour in guests -%}   I was there{% endif -%}   !", data); // Renders without any whitespaces
 ```
 
-Stripping behind a statement also remove any newlines.
+Stripping behind a statement or expression also removes any newlines.
 
 ### Callbacks
 
@@ -299,6 +306,13 @@ env.add_callback("double-greetings", 0, [greet](Arguments args) {
 });
 env.render("{{ double-greetings }}", data); // "Hello Hello!"
 ```
+You can also add a void callback without return variable, e.g. for debugging:
+```.cpp
+env.add_void_callback("log", 1, [greet](Arguments args) {
+	std::cout << "logging: " << args[0] << std::endl;
+});
+env.render("{{ log(neighbour) }}", data); // Prints nothing to result, only to cout...
+```
 
 ### Comments
 
@@ -306,7 +320,6 @@ Comments can be written with the `{# ... #}` syntax.
 ```.cpp
 render("Hello{# Todo #}!", data); // "Hello!"
 ```
-
 
 ## Supported compilers
 

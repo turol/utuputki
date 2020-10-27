@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Pantor. All rights reserved.
+// Copyright (c) 2020 Pantor. All rights reserved.
 
 #include "doctest/doctest.h"
 #include "inja/inja.hpp"
@@ -223,13 +223,25 @@ TEST_CASE("callbacks") {
     return number1 * number2 * number3;
   });
 
+  env.add_callback("length", 1, [](inja::Arguments args) {
+    auto number1 = args.at(0)->get<std::string>();
+    return number1.length();
+  });
+
+  env.add_void_callback("log", 1, [](inja::Arguments args) {
+    int a = 2;
+  });
+
   env.add_callback("multiply", 0, [](inja::Arguments args) { return 1.0; });
 
   CHECK(env.render("{{ double(age) }}", data) == "56");
   CHECK(env.render("{{ half(age) }}", data) == "14");
+  CHECK(env.render("{{ log(age) }}", data) == "");
   CHECK(env.render("{{ double-greetings }}", data) == "Hello Hello!");
   CHECK(env.render("{{ double-greetings() }}", data) == "Hello Hello!");
   CHECK(env.render("{{ multiply(4, 5) }}", data) == "20.0");
+  CHECK(env.render("{{ multiply(length(\"tester\"), 5) }}", data) == "30.0");
+  CHECK(env.render("{{ multiply(5, length(\"t\")) }}", data) == "5.0");
   CHECK(env.render("{{ multiply(3, 4, 5) }}", data) == "60.0");
   CHECK(env.render("{{ multiply }}", data) == "1.0");
 
@@ -268,4 +280,8 @@ TEST_CASE("combinations") {
   CHECK(env.render("{{ last(list_of_objects).d * 2}}", data) == "10");
   CHECK(env.render("{{ last(range(5)) * 2 }}", data) == "8");
   CHECK(env.render("{{ last(range(5 * 2)) }}", data) == "9");
+  CHECK(env.render("{{ last(range(5 * 2)) }}", data) == "9");
+  CHECK(env.render("{{ not true }}", data) == "false");
+  CHECK(env.render("{{ not (true) }}", data) == "false");
+  CHECK(env.render("{{ true or (true or true) }}", data) == "true");
 }

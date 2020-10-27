@@ -13,6 +13,7 @@ using json = nlohmann::json;
 
 using Arguments = std::vector<const json *>;
 using CallbackFunction = std::function<json(Arguments &args)>;
+using VoidCallbackFunction = std::function<void(Arguments &args)>;
 
 /*!
  * \brief Class for builtin functions and user-defined callbacks.
@@ -69,13 +70,14 @@ public:
     None,
   };
 
-  const int VARIADIC {-1};
-
   struct FunctionData {
-    Operation operation;
-
-    CallbackFunction callback;
+    explicit FunctionData(const Operation &op, const CallbackFunction &cb = CallbackFunction{}) : operation(op), callback(cb) {}
+    const Operation operation;
+    const CallbackFunction callback;
   };
+
+private:
+  const int VARIADIC {-1};
 
   std::map<std::pair<std::string, int>, FunctionData> function_storage = {
     {std::make_pair("at", 2), FunctionData { Operation::At }},
@@ -128,7 +130,7 @@ public:
       }
     }
 
-    return { Operation::None };
+    return FunctionData { Operation::None };
   }
 };
 

@@ -139,14 +139,14 @@ class Parser {
             add_json_literal(tmpl.content.c_str());
           }
 
+	      // Operator
+        } else if (tok.text == "and" || tok.text == "or" || tok.text == "in" || tok.text == "not") {
+          goto parse_operator;
+
         // Functions
         } else if (peek_tok.kind == Token::Kind::LeftParen) {
           operator_stack.emplace(std::make_shared<FunctionNode>(static_cast<std::string>(tok.text), tok.text.data() - tmpl.content.c_str()));
-          function_stack.emplace(operator_stack.top().get(), current_paren_level);
-
-        // Operator
-        } else if (tok.text == "and" || tok.text == "or" || tok.text == "in" || tok.text == "not") {
-          goto parse_operator;
+          function_stack.emplace(operator_stack.top().get(), current_paren_level);       
 
         // Variables
         } else {
@@ -268,12 +268,12 @@ class Parser {
       } break;
       case Token::Kind::RightParen: {
         current_paren_level -= 1;
-        while (operator_stack.top()->operation != FunctionStorage::Operation::ParenLeft) {
+        while (!operator_stack.empty() && operator_stack.top()->operation != FunctionStorage::Operation::ParenLeft) {
           current_expression_list->rpn_output.emplace_back(operator_stack.top());
           operator_stack.pop();
         }
 
-        if (operator_stack.top()->operation == FunctionStorage::Operation::ParenLeft) {
+        if (!operator_stack.empty() && operator_stack.top()->operation == FunctionStorage::Operation::ParenLeft) {
           operator_stack.pop();
         }
 
@@ -288,6 +288,12 @@ class Parser {
             func->callback = function_data.callback;
           }
 
+          if (operator_stack.empty()) {
+            throw_parser_error("internal error at function " + func->name);
+          }
+
+          current_expression_list->rpn_output.emplace_back(operator_stack.top());
+          operator_stack.pop();
           function_stack.pop();
         }
       }
@@ -314,9 +320,8 @@ class Parser {
     if (tok.text == static_cast<decltype(tok.text)>("if")) {
       get_next_token();
 
-      auto if_statement_node = std::make_shared<IfStatementNode>(tok.text.data() - tmpl.content.c_str());
+      auto if_statement_node = std::make_shared<IfStatementNode>(current_block, tok.text.data() - tmpl.content.c_str());
       current_block->nodes.emplace_back(if_statement_node);
-      if_statement_node->parent = current_block;
       if_statement_stack.emplace(if_statement_node.get());
       current_block = &if_statement_node->true_statement;
       current_expression_list = &if_statement_node->condition;
@@ -339,9 +344,8 @@ class Parser {
       if (tok.kind == Token::Kind::Id && tok.text == static_cast<decltype(tok.text)>("if")) {
         get_next_token();
 
-        auto if_statement_node = std::make_shared<IfStatementNode>(true, tok.text.data() - tmpl.content.c_str());
+        auto if_statement_node = std::make_shared<IfStatementNode>(true, current_block, tok.text.data() - tmpl.content.c_str());
         current_block->nodes.emplace_back(if_statement_node);
-        if_statement_node->parent = current_block;
         if_statement_stack.emplace(if_statement_node.get());
         current_block = &if_statement_node->true_statement;
         current_expression_list = &if_statement_node->condition;
@@ -390,15 +394,14 @@ class Parser {
         value_token = tok;
         get_next_token();
 
-        for_statement_node = std::make_shared<ForObjectStatementNode>(key_token.text, value_token.text, tok.text.data() - tmpl.content.c_str());
+        for_statement_node = std::make_shared<ForObjectStatementNode>(static_cast<std::string>(key_token.text), static_cast<std::string>(value_token.text), current_block, tok.text.data() - tmpl.content.c_str());
 
       // Array type
       } else {
-        for_statement_node = std::make_shared<ForArrayStatementNode>(value_token.text, tok.text.data() - tmpl.content.c_str());
+        for_statement_node = std::make_shared<ForArrayStatementNode>(static_cast<std::string>(value_token.text), current_block, tok.text.data() - tmpl.content.c_str());
       }
 
       current_block->nodes.emplace_back(for_statement_node);
-      for_statement_node->parent = current_block;
       for_statement_stack.emplace(for_statement_node.get());
       current_block = &for_statement_node->body;
       current_expression_list = &for_statement_node->condition;
@@ -448,6 +451,29 @@ class Parser {
       current_block->nodes.emplace_back(std::make_shared<IncludeStatementNode>(pathname, tok.text.data() - tmpl.content.c_str()));
 
       get_next_token();
+
+    } else if (tok.text == static_cast<decltype(tok.text)>("set")) {
+      get_next_token();
+
+      if (tok.kind != Token::Kind::Id) {
+        throw_parser_error("expected variable name, got '" + tok.describe() + "'");
+      }
+
+      std::string key = static_cast<std::string>(tok.text);
+      get_next_token();
+
+      auto set_statement_node = std::make_shared<SetStatementNode>(key, tok.text.data() - tmpl.content.c_str());
+      current_block->nodes.emplace_back(set_statement_node);
+      current_expression_list = &set_statement_node->expression;
+
+      if (tok.text != static_cast<decltype(tok.text)>("=")) {
+        throw_parser_error("expected '=', got '" + tok.describe() + "'");
+      }
+      get_next_token();
+
+      if (!parse_expression(tmpl, closing)) {
+        return false;
+      }
 
     } else {
       return false;

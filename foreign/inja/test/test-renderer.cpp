@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Pantor. All rights reserved.
+// Copyright (c) 2020 Pantor. All rights reserved.
 
 #include "doctest/doctest.h"
 #include "inja/inja.hpp"
@@ -122,6 +122,13 @@ TEST_CASE("types") {
                       "[inja.exception.parser_error] (at 1:43) expected statement, got 'end'");
   }
 
+  SUBCASE("set statements") {
+    CHECK(env.render("{% set predefined=true %}{% if predefined %}a{% endif %}", data) == "a");
+    CHECK(env.render("{% set predefined=false %}{% if predefined %}a{% endif %}", data) == "");
+    CHECK_THROWS_WITH(env.render("{% if predefined %}{% endif %}", data), 
+                      "[inja.exception.render_error] (at 1:7) variable 'predefined' not found");
+  }
+
   SUBCASE("line statements") {
     CHECK(env.render(R""""(## if is_happy
 Yeah!
@@ -197,6 +204,10 @@ TEST_CASE("templates") {
     CHECK(env.render("Test\n   {%- if is_happy %}{{ name }}{% endif %}   ", data) == "Test\nPeter   ");
     CHECK(env.render("   {%+ if is_happy %}{{ name }}{% endif %}", data) == "   Peter");
     CHECK(env.render("   {%- if is_happy %}{{ name }}{% endif -%}   \n   ", data) == "Peter");
+    
+    CHECK(env.render("   {{- name -}}   \n   ", data) == "Peter");
+    CHECK(env.render("Test\n   {{- name }}   ", data) == "Test\nPeter   ");
+    CHECK(env.render("   {{ name }}\n ", data) == "   Peter\n ");
 
     // Nothing will be stripped if there are other characters before the start of the block.
     CHECK(env.render(".  {%- if is_happy %}{{ name }}{% endif -%}\n", data) == ".  Peter");

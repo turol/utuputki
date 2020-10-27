@@ -19,6 +19,7 @@ class Lexer {
   enum class State {
     Text,
     ExpressionStart,
+    ExpressionStartForceLstrip,
     ExpressionBody,
     LineStart,
     LineBody,
@@ -268,7 +269,7 @@ class Lexer {
   }
 
 public:
-  explicit Lexer(const LexerConfig &config) : config(config) {}
+  explicit Lexer(const LexerConfig &config) : config(config), state(State::Text), minus_state(MinusState::Number) {}
 
   SourceLocation current_position() const {
     return get_source_location(m_in, tok_start);
@@ -280,6 +281,11 @@ public:
     pos = 0;
     state = State::Text;
     minus_state = MinusState::Number;
+
+    // Consume byte order mark (BOM) for UTF-8
+    if (inja::string_view::starts_with(m_in, "\xEF\xBB\xBF")) {
+      m_in = m_in.substr(3);
+    }
   }
 
   Token scan() {
@@ -306,7 +312,12 @@ public:
       nonstd::string_view open_str = m_in.substr(pos);
       bool must_lstrip = false;
       if (inja::string_view::starts_with(open_str, config.expression_open)) {
-        state = State::ExpressionStart;
+        if (inja::string_view::starts_with(open_str, config.expression_open_force_lstrip)) {
+          state = State::ExpressionStartForceLstrip;
+          must_lstrip = true;
+        } else {
+          state = State::ExpressionStart;
+        }
       } else if (inja::string_view::starts_with(open_str, config.statement_open)) {
         if (inja::string_view::starts_with(open_str, config.statement_open_no_lstrip)) {
           state = State::StatementStartNoLstrip;
@@ -320,8 +331,7 @@ public:
       } else if (inja::string_view::starts_with(open_str, config.comment_open)) {
         state = State::CommentStart;
         must_lstrip = config.lstrip_blocks;
-      } else if ((pos == 0 || m_in[pos - 1] == '\n') &&
-                 inja::string_view::starts_with(open_str, config.line_statement)) {
+      } else if ((pos == 0 || m_in[pos - 1] == '\n') && inja::string_view::starts_with(open_str, config.line_statement)) {
         state = State::LineStart;
       } else {
         pos += 1; // wasn't actually an opening sequence
@@ -341,6 +351,11 @@ public:
     case State::ExpressionStart: {
       state = State::ExpressionBody;
       pos += config.expression_open.size();
+      return make_token(Token::Kind::ExpressionOpen);
+    }
+    case State::ExpressionStartForceLstrip: {
+      state = State::ExpressionBody;
+      pos += config.expression_open_force_lstrip.size();
       return make_token(Token::Kind::ExpressionOpen);
     }
     case State::LineStart: {
@@ -369,7 +384,7 @@ public:
       return make_token(Token::Kind::CommentOpen);
     }
     case State::ExpressionBody:
-      return scan_body(config.expression_close, Token::Kind::ExpressionClose);
+      return scan_body(config.expression_close, Token::Kind::ExpressionClose, config.expression_close_force_rstrip);
     case State::LineBody:
       return scan_body("\n", Token::Kind::LineStatementClose);
     case State::StatementBody:
