@@ -15,6 +15,7 @@ The {fmt} library API consists of the following parts:
   and tuples
 * :ref:`fmt/chrono.h <chrono-api>`: date and time formatting
 * :ref:`fmt/compile.h <compile-api>`: format string compilation
+* :ref:`fmt/color.h <color-api>`: terminal color and text style
 * :ref:`fmt/ostream.h <ostream-api>`: ``std::ostream`` support
 * :ref:`fmt/printf.h <printf-api>`: ``printf`` formatting
 
@@ -47,6 +48,10 @@ participate in an overload resolution if the latter is not a string.
 .. doxygenfunction:: format(const S&, Args&&...)
 .. doxygenfunction:: vformat(const S&, basic_format_args<buffer_context<type_identity_t<Char>>>)
 
+.. doxygenfunction:: fmt::format_to(OutputIt, const S&, Args&&...)
+.. doxygenfunction:: fmt::format_to_n(OutputIt, size_t, const S&, const Args&...)
+.. doxygenfunction:: fmt::formatted_size(string_view, Args&&...)
+
 .. _print:
 
 .. doxygenfunction:: print(const S&, Args&&...)
@@ -64,6 +69,35 @@ Named arguments are not supported in compile-time checks at the moment.
 
 Argument Lists
 --------------
+
+You can create your own formatting function with compile-time checks and small
+binary footprint, for example (https://godbolt.org/z/oba4Mc):
+
+.. code:: c++
+
+    #include <fmt/format.h>
+
+    void vlog(const char* file, int line, fmt::string_view format,
+              fmt::format_args args) {
+      fmt::print("{}: {}: ", file, line);
+      fmt::vprint(format, args);
+    }
+
+    template <typename S, typename... Args>
+    void log(const char* file, int line, const S& format, Args&&... args) {
+      vlog(file, line, format,
+          fmt::make_args_checked<Args...>(format, args...));
+    }
+
+    #define MY_LOG(format, ...) \
+      log(__FILE__, __LINE__, FMT_STRING(format), __VA_ARGS__)
+
+    MY_LOG("invalid squishiness: {}", 42);
+
+Note that ``vlog`` is not parameterized on argument types which improves compile
+times and reduces binary code size compared to a fully parameterized version.
+
+.. doxygenfunction:: fmt::make_args_checked(const S&, const remove_reference_t<Args>&...)
 
 .. doxygenfunction:: fmt::make_format_args(const Args&...)
 
@@ -93,7 +127,7 @@ Compatibility
 Locale
 ------
 
-All formatting is locale-independent by default. Use the ``'n'`` format
+All formatting is locale-independent by default. Use the ``'L'`` format
 specifier to insert the appropriate number separator characters from the
 locale::
 
@@ -114,11 +148,13 @@ string checks, wide string, output iterator and user-defined type support.
 Compile-time Format String Checks
 ---------------------------------
 
-Compile-time checks are supported for built-in and string types as well as
-user-defined types with ``constexpr`` ``parse`` functions in their ``formatter``
-specializations.
+Compile-time checks are enabled when using ``FMT_STRING``. They support built-in
+and string types as well as user-defined types with ``constexpr`` ``parse``
+functions in their ``formatter`` specializations.
 
 .. doxygendefine:: FMT_STRING
+
+.. _udt:
 
 Formatting User-defined Types
 -----------------------------
@@ -237,6 +273,10 @@ You can also write a formatter for a hierarchy of classes::
     fmt::print("{}", a); // prints "B"
   }
 
+If a type provides both a ``formatter`` specialization and an implicit
+conversion to a formattable type, the specialization takes precedence over the
+conversion.
+
 .. doxygenclass:: fmt::basic_format_parse_context
    :members:
 
@@ -264,7 +304,9 @@ Utilities
 
 .. doxygentypedef:: fmt::char_t
 
-.. doxygenfunction:: fmt::formatted_size(string_view, const Args&...)
+.. doxygenfunction:: fmt::ptr(const T *)
+.. doxygenfunction:: fmt::ptr(const std::unique_ptr<T>&)
+.. doxygenfunction:: fmt::ptr(const std::shared_ptr<T>&)
 
 .. doxygenfunction:: fmt::to_string(const T&)
 
@@ -272,7 +314,7 @@ Utilities
 
 .. doxygenfunction:: fmt::to_string_view(const Char *)
 
-.. doxygenfunction:: fmt::join(const Range&, string_view)
+.. doxygenfunction:: fmt::join(Range&&, string_view)
 
 .. doxygenfunction:: fmt::join(It, Sentinel, string_view)
 
@@ -297,8 +339,6 @@ the value of ``errno`` being preserved by library functions.
 
 .. doxygenclass:: fmt::windows_error
    :members:
-
-.. _formatstrings:
 
 Custom Allocators
 -----------------
@@ -330,10 +370,10 @@ allocator::
       return vformat(alloc, format_str, fmt::make_format_args(args...));
     }
 
-The allocator will be used for the output container only. If you are using named
-arguments, the container that stores pointers to them will be allocated using
-the default allocator. Also floating-point formatting falls back on ``sprintf``
-which may do allocations.
+The allocator will be used for the output container only. Formatting functions
+normally don't do any allocations for built-in and string types except for
+non-default floating-point formatting that occasionally falls back on
+``sprintf``.
 
 .. _ranges-api:
 
@@ -383,15 +423,25 @@ The format string syntax is described in the documentation of
 Format string compilation
 =========================
 
-``fmt/compile.h`` provides format string compilation support. Format strings
-are parsed at compile time and converted into efficient formatting code. This
-supports arguments of built-in and string types as well as user-defined types
+``fmt/compile.h`` provides format string compilation support when using
+``FMT_COMPILE``. Format strings are parsed, checked and converted
+into efficient formatting code at compile-time.
+This supports arguments of built-in and string types as well as user-defined types
 with ``constexpr`` ``parse`` functions in their ``formatter`` specializations.
 Format string compilation can generate more binary code compared to the default
 API and is only recommended in places where formatting is a performance
 bottleneck.
 
 .. doxygendefine:: FMT_COMPILE
+
+.. _color-api:
+
+Terminal color and text style
+=============================
+
+``fmt/color.h`` provides support for terminal color and text style output.
+
+.. doxygenfunction:: print(const text_style&, const S&, const Args&...)
 
 .. _ostream-api:
 

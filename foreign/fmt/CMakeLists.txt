@@ -1,10 +1,8 @@
-cmake_minimum_required(VERSION 3.1.0)
+cmake_minimum_required(VERSION 3.1...3.18)
 
-# Use newer policies if available, up to most recent tested version of CMake.
-if(${CMAKE_VERSION} VERSION_LESS 3.11)
+# Fallback for using newer policies on CMake <3.12.
+if(${CMAKE_VERSION} VERSION_LESS 3.12)
   cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
-else()
-  cmake_policy(VERSION 3.11)
 endif()
 
 # Determine if fmt is built as a subproject (using add_subdirectory)
@@ -55,8 +53,8 @@ endif ()
 project(FMT CXX)
 include(GNUInstallDirs)
 set_verbose(FMT_INC_DIR ${CMAKE_INSTALL_INCLUDEDIR} CACHE STRING
-            "Installation directory for include files, a relative path "
-            "that will be joined to ${CMAKE_INSTALL_PREFIX}, or an arbitrary absolute path.")
+            "Installation directory for include files, a relative path that "
+            "will be joined with ${CMAKE_INSTALL_PREFIX} or an absolute path.")
 
 option(FMT_PEDANTIC "Enable extra warnings and expensive tests." OFF)
 option(FMT_WERROR "Halt the compilation with an error on compiler warnings."
@@ -109,11 +107,11 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
       -Wold-style-cast -Wundef
       -Wredundant-decls -Wwrite-strings -Wpointer-arith
       -Wcast-qual -Wformat=2 -Wmissing-include-dirs
-      -Wcast-align -Wnon-virtual-dtor
+      -Wcast-align
       -Wctor-dtor-privacy -Wdisabled-optimization
       -Winvalid-pch -Woverloaded-virtual
-      -Wconversion -Wswitch-enum
-      -Wno-ctor-dtor-privacy -Wno-format-nonliteral -Wno-shadow)
+      -Wconversion -Wswitch-enum -Wundef
+      -Wno-ctor-dtor-privacy -Wno-format-nonliteral)
   if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.6)
       set(PEDANTIC_COMPILE_FLAGS ${PEDANTIC_COMPILE_FLAGS} -Wnoexcept
          -Wno-dangling-else -Wno-unused-local-typedefs)
@@ -131,8 +129,8 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
 endif ()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  set(PEDANTIC_COMPILE_FLAGS -Wall -Wextra -pedantic -Wconversion
-      -Wno-sign-conversion -Wdeprecated -Wweak-vtables)
+  set(PEDANTIC_COMPILE_FLAGS -Wall -Wextra -pedantic -Wconversion -Wundef
+      -Wdeprecated -Wweak-vtables)
   check_cxx_compiler_flag(-Wzero-as-null-pointer-constant HAS_NULLPTR_WARNING)
   if (HAS_NULLPTR_WARNING)
     set(PEDANTIC_COMPILE_FLAGS ${PEDANTIC_COMPILE_FLAGS}
@@ -201,7 +199,10 @@ if (HAVE_STRTOD_L)
 endif ()
 
 if (MINGW)
-  target_compile_options(fmt PUBLIC "-Wa,-mbig-obj")
+  check_cxx_compiler_flag("Wa,-mbig-obj" FMT_HAS_MBIG_OBJ)
+  if (${FMT_HAS_MBIG_OBJ})
+    target_compile_options(fmt PUBLIC "-Wa,-mbig-obj")
+  endif()
 endif ()
 
 if (FMT_WERROR)
@@ -231,7 +232,8 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif ()
 
 if (BUILD_SHARED_LIBS)
-  if (UNIX AND NOT APPLE AND NOT ${CMAKE_SYSTEM_NAME} MATCHES "SunOS" AND NOT EMSCRIPTEN)
+  if (UNIX AND NOT APPLE AND NOT ${CMAKE_SYSTEM_NAME} MATCHES "SunOS" AND
+      NOT EMSCRIPTEN)
     # Fix rpmlint warning:
     # unused-direct-shlib-dependency /usr/lib/libformat.so.1.1.0 /lib/libm.so.6.
     target_link_libraries(fmt -Wl,--as-needed)
@@ -256,20 +258,22 @@ target_include_directories(fmt-header-only INTERFACE
 if (FMT_INSTALL)
   include(CMakePackageConfigHelpers)
   set_verbose(FMT_CMAKE_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/fmt CACHE STRING
-              "Installation directory for cmake files, a relative path "
-              "that will be joined to ${CMAKE_INSTALL_PREFIX}, or an arbitrary absolute path.")
+              "Installation directory for cmake files, a relative path that "
+              "will be joined with ${CMAKE_INSTALL_PREFIX} or an absolute "
+              "path.")
   set(version_config ${PROJECT_BINARY_DIR}/fmt-config-version.cmake)
   set(project_config ${PROJECT_BINARY_DIR}/fmt-config.cmake)
   set(pkgconfig ${PROJECT_BINARY_DIR}/fmt.pc)
   set(targets_export_name fmt-targets)
 
   set_verbose(FMT_LIB_DIR ${CMAKE_INSTALL_LIBDIR} CACHE STRING
-              "Installation directory for libraries, a relative path "
-              "that will be joined to ${CMAKE_INSTALL_PREFIX}, or an arbitrary absolute path.")
+              "Installation directory for libraries, a relative path that "
+              "will be joined to ${CMAKE_INSTALL_PREFIX} or an absolute path.")
 
   set_verbose(FMT_PKGCONFIG_DIR ${CMAKE_INSTALL_LIBDIR}/pkgconfig CACHE PATH
-              "Installation directory for pkgconfig (.pc) files, a relative path "
-              "that will be joined to ${CMAKE_INSTALL_PREFIX}, or an arbitrary absolute path.")
+              "Installation directory for pkgconfig (.pc) files, a relative "
+              "path that will be joined with ${CMAKE_INSTALL_PREFIX} or an "
+              "absolute path.")
 
   # Generate the version, config and target files into the build directory.
   write_basic_package_version_file(
@@ -326,6 +330,12 @@ endif ()
 # Control fuzzing independent of the unit tests.
 if (FMT_FUZZ)
   add_subdirectory(test/fuzzing)
+
+  # The FMT_FUZZ macro is used to prevent resource exhaustion in fuzzing
+  # mode and make fuzzing practically possible. It is similar to
+  # FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION but uses a different name to
+  # avoid interfering with fuzzing of projects that use {fmt}.
+  # See also https://llvm.org/docs/LibFuzzer.html#fuzzer-friendly-build-mode.
   target_compile_definitions(fmt PUBLIC FMT_FUZZ)
 endif ()
 

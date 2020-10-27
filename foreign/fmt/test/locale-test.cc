@@ -7,6 +7,8 @@
 
 #include "fmt/locale.h"
 
+#include <complex>
+
 #include "gmock.h"
 
 using fmt::detail::max_value;
@@ -50,6 +52,7 @@ TEST(LocaleTest, Format) {
   EXPECT_EQ("1234567", fmt::format(std::locale(), "{:L}", 1234567));
   EXPECT_EQ("1~234~567", fmt::format(loc, "{:L}", 1234567));
   EXPECT_EQ("-1~234~567", fmt::format(loc, "{:L}", -1234567));
+  EXPECT_EQ("-256", fmt::format(loc, "{:L}", -256));
   fmt::format_arg_store<fmt::format_context, int> as{1234567};
   EXPECT_EQ("1~234~567", fmt::vformat(loc, "{:L}", fmt::format_args(as)));
   std::string s;
@@ -104,6 +107,54 @@ TEST(LocaleTest, DoubleFormatter) {
       buf, {}, fmt::detail::locale_ref(loc));
   *f.format(12345, format_ctx) = 0;
   EXPECT_STREQ("12,345", buf);
+}
+
+FMT_BEGIN_NAMESPACE
+template <class charT> struct formatter<std::complex<double>, charT> {
+ private:
+  detail::dynamic_format_specs<char> specs_;
+
+ public:
+  typename basic_format_parse_context<charT>::iterator parse(
+      basic_format_parse_context<charT>& ctx) {
+    using handler_type =
+        detail::dynamic_specs_handler<basic_format_parse_context<charT>>;
+    detail::specs_checker<handler_type> handler(handler_type(specs_, ctx),
+                                                detail::type::string_type);
+    auto it = parse_format_specs(ctx.begin(), ctx.end(), handler);
+    detail::parse_float_type_spec(specs_, ctx.error_handler());
+    return it;
+  }
+
+  template <class FormatContext>
+  typename FormatContext::iterator format(const std::complex<double>& c,
+                                          FormatContext& ctx) {
+    detail::handle_dynamic_spec<detail::precision_checker>(
+        specs_.precision, specs_.precision_ref, ctx);
+    auto format_specs = std::string();
+    if (specs_.precision > 0)
+      format_specs = fmt::format(".{}", specs_.precision);
+    if (specs_.type)
+      format_specs += specs_.type;
+    auto real = fmt::format(ctx.locale().template get<std::locale>(),
+                            "{:" + format_specs + "}", c.real());
+    auto imag = fmt::format(ctx.locale().template get<std::locale>(),
+                            "{:" + format_specs + "}", c.imag());
+    auto fill_align_width = std::string();
+    if (specs_.width > 0)
+      fill_align_width = fmt::format(">{}", specs_.width);
+    return format_to(
+        ctx.out(), "{:" + fill_align_width + "}",
+        fmt::format(c.real() != 0 ? "({0}+{1}i)" : "{1}i", real, imag));
+  }
+};
+FMT_END_NAMESPACE
+
+TEST(FormatTest, Complex) {
+  std::string s = fmt::format("{}", std::complex<double>(1, 2));
+  EXPECT_EQ(s, "(1+2i)");
+  EXPECT_EQ(fmt::format("{:.2f}", std::complex<double>(1, 2)), "(1.00+2.00i)");
+  EXPECT_EQ(fmt::format("{:8}", std::complex<double>(1, 2)), "  (1+2i)");
 }
 
 #endif  // FMT_STATIC_THOUSANDS_SEPARATOR
