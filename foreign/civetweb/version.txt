@@ -1,6 +1,5 @@
-commit 4b440a339979852d5a51fb11a822952712231c23
-Merge: d6a604b5 4bc4fc98
+commit 8e243456965c9be5212cb96519da69cd54550e3d
 Author: bel2125 <bel2125@gmail.com>
-Date:   Mon Mar 16 22:35:36 2020 +0100
+Date:   Wed Sep 30 20:24:15 2020 +0200
 
-    Merge branch 'master' of https://github.com/civetweb/civetweb
+    Fix coverity issues for release 1.13
