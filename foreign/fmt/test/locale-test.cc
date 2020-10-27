@@ -68,6 +68,11 @@ TEST(LocaleTest, Format) {
             fmt::format(small_grouping_loc, "{:L}", max_value<uint32_t>()));
 }
 
+TEST(LocaleTest, FormatDetaultAlign) {
+  std::locale special_grouping_loc(std::locale(), new special_grouping<char>());
+  EXPECT_EQ("  12,345", fmt::format(special_grouping_loc, "{:8L}", 12345));
+}
+
 TEST(LocaleTest, WFormat) {
   std::locale loc(std::locale(), new numpunct<wchar_t>());
   EXPECT_EQ(L"1234567", fmt::format(std::locale(), L"{:L}", 1234567));
@@ -87,6 +92,18 @@ TEST(LocaleTest, WFormat) {
   std::locale small_grouping_loc(std::locale(), new small_grouping<wchar_t>());
   EXPECT_EQ(L"4,2,9,4,9,6,7,2,9,5",
             fmt::format(small_grouping_loc, L"{:L}", max_value<uint32_t>()));
+}
+
+TEST(LocaleTest, DoubleFormatter) {
+  auto loc = std::locale(std::locale(), new special_grouping<char>());
+  auto f = fmt::formatter<int>();
+  auto parse_ctx = fmt::format_parse_context("L");
+  f.parse(parse_ctx);
+  char buf[10] = {};
+  fmt::basic_format_context<char*, char> format_ctx(
+      buf, {}, fmt::detail::locale_ref(loc));
+  *f.format(12345, format_ctx) = 0;
+  EXPECT_STREQ("12,345", buf);
 }
 
 #endif  // FMT_STATIC_THOUSANDS_SEPARATOR
