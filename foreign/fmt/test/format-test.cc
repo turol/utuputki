@@ -1945,10 +1945,12 @@ TEST(FormatTest, FormatToN) {
   EXPECT_EQ(5u, result.size);
   EXPECT_EQ(buffer + 3, result.out);
   EXPECT_EQ("123x", fmt::string_view(buffer, 4));
+
   result = fmt::format_to_n(buffer, 3, "{:s}", "foobar");
   EXPECT_EQ(6u, result.size);
   EXPECT_EQ(buffer + 3, result.out);
   EXPECT_EQ("foox", fmt::string_view(buffer, 4));
+
   buffer[0] = 'x';
   buffer[1] = 'x';
   buffer[2] = 'x';
@@ -1956,10 +1958,20 @@ TEST(FormatTest, FormatToN) {
   EXPECT_EQ(1u, result.size);
   EXPECT_EQ(buffer + 1, result.out);
   EXPECT_EQ("Axxx", fmt::string_view(buffer, 4));
+
   result = fmt::format_to_n(buffer, 3, "{}{} ", 'B', 'C');
   EXPECT_EQ(3u, result.size);
   EXPECT_EQ(buffer + 3, result.out);
   EXPECT_EQ("BC x", fmt::string_view(buffer, 4));
+
+  result = fmt::format_to_n(buffer, 4, "{}", "ABCDE");
+  EXPECT_EQ(5u, result.size);
+  EXPECT_EQ("ABCD", fmt::string_view(buffer, 4));
+
+  buffer[3] = 'x';
+  result = fmt::format_to_n(buffer, 3, "{}", std::string(1000, '*'));
+  EXPECT_EQ(1000u, result.size);
+  EXPECT_EQ("***x", fmt::string_view(buffer, 4));
 }
 
 TEST(FormatTest, WideFormatToN) {
@@ -2416,11 +2428,13 @@ TEST(FormatTest, CharTraitsIsNotAmbiguous) {
 #endif
 }
 
+#if __cplusplus > 201103L
 struct custom_char {
   int value;
   custom_char() = default;
 
-  template <typename T> custom_char(T val) : value(static_cast<int>(val)) {}
+  template <typename T>
+  constexpr custom_char(T val) : value(static_cast<int>(val)) {}
 
   operator int() const { return value; }
 };
@@ -2437,6 +2451,7 @@ TEST(FormatTest, FormatCustomChar) {
   EXPECT_EQ(result.size(), 1);
   EXPECT_EQ(result[0], custom_char('x'));
 }
+#endif
 
 // Convert a char8_t string to std::string. Otherwise GTest will insist on
 // inserting `char8_t` NTBS into a `char` stream which is disabled by P1423.
