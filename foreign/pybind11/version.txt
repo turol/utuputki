@@ -1,10 +1,5 @@
-commit 97976c16fb7652f7faf02d76756666ef87adbe7d
-Author: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
-Date:   Mon Oct 4 16:38:31 2021 -0400
+commit f7b499615e14d70ab098a20deb0cdb3889998a1a
+Author: Ralf W. Grosse-Kunstleve <rwgk@google.com>
+Date:   Wed Oct 27 14:35:10 2021 -0700
 
-    [pre-commit.ci] pre-commit autoupdate (#3325)
-    
-    updates:
-    - [github.com/asottile/pyupgrade: v2.28.0 → v2.29.0](https://github.com/asottile/pyupgrade/compare/v2.28.0...v2.29.0)
-    
-    Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
+    [skip ci] Tweaks in preparation for the 2.8.1 release. (#3421)
