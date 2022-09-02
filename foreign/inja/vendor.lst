@@ -44,11 +44,17 @@ test/data/benchmark/medium_template.txt
 test/data/benchmark/small_data.json
 test/data/error-unknown/data.json
 test/data/error-unknown/template.txt
+test/data/html-extend/base.txt
+test/data/html-extend/data.json
+test/data/html-extend/inter.txt
+test/data/html-extend/result.txt
+test/data/html-extend/template.txt
 test/data/html/data.json
 test/data/html/footer.txt
 test/data/html/header.txt
 test/data/html/result.txt
 test/data/html/template.txt
+test/data/include-both.txt
 test/data/include.txt
 test/data/nested-line/data.json
 test/data/nested-line/result.txt
@@ -63,6 +69,8 @@ test/data/simple-file/data.json
 test/data/simple-file/result.txt
 test/data/simple-file/template.txt
 test/data/simple.txt
+test/jinja.py
+test/templates/example.txt
 test/test-files.cpp
 test/test-functions.cpp
 test/test-renderer.cpp

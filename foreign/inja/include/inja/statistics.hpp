@@ -1,5 +1,3 @@
-// Copyright (c) 2019 Pantor. All rights reserved.
-
 #ifndef INCLUDE_INJA_STATISTICS_HPP_
 #define INCLUDE_INJA_STATISTICS_HPP_
 
@@ -26,12 +24,14 @@ class StatisticsVisitor : public NodeVisitor {
     variable_counter += 1;
   }
 
-  void visit(const FunctionNode&) { }
-
-  void visit(const ExpressionListNode& node) {
-    for (auto& n : node.rpn_output) {
+  void visit(const FunctionNode& node) {
+    for (auto& n : node.arguments) {
       n->accept(*this);
     }
+  }
+
+  void visit(const ExpressionListNode& node) {
+    node.root->accept(*this);
   }
 
   void visit(const StatementNode&) { }
@@ -54,6 +54,12 @@ class StatisticsVisitor : public NodeVisitor {
   }
 
   void visit(const IncludeStatementNode&) { }
+
+  void visit(const ExtendsStatementNode&) { }
+
+  void visit(const BlockStatementNode& node) {
+    node.block.accept(*this);
+  }
 
   void visit(const SetStatementNode&) { }
 

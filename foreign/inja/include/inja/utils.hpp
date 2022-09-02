@@ -1,5 +1,3 @@
-// Copyright (c) 2020 Pantor. All rights reserved.
-
 #ifndef INCLUDE_INJA_UTILS_HPP_
 #define INCLUDE_INJA_UTILS_HPP_
 
@@ -15,11 +13,15 @@ namespace inja {
 
 inline void open_file_or_throw(const std::string &path, std::ifstream &file) {
   file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+#ifndef INJA_NOEXCEPTION
   try {
     file.open(path);
   } catch (const std::ios_base::failure & /*e*/) {
     INJA_THROW(FileError("failed accessing file at '" + path + "'"));
   }
+#else
+  file.open(path);
+#endif
 }
 
 namespace string_view {
@@ -63,6 +65,17 @@ inline SourceLocation get_source_location(nonstd::string_view content, size_t po
   }
 
   return {count_lines + 1, sliced.length() - last_newline};
+}
+
+inline void replace_substring(std::string& s, const std::string& f,
+                              const std::string& t)
+{
+  if (f.empty()) return;
+  for (auto pos = s.find(f);                  // find first occurrence of f
+            pos != std::string::npos;         // make sure f was found
+            s.replace(pos, f.size(), t),      // replace with t, and
+            pos = s.find(f, pos + t.size()))  // find next occurrence of f
+  {}
 }
 
 } // namespace inja

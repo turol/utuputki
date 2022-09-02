@@ -8,7 +8,7 @@
   <a href="https://github.com/pantor/inja/actions">
     <img src="https://github.com/pantor/inja/workflows/Documentation/badge.svg" alt="Documentation Status">
   </a>
-  
+
   <a href="https://www.codacy.com/manual/pantor/inja?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=pantor/inja&amp;utm_campaign=Badge_Grade">
     <img src="https://app.codacy.com/project/badge/Grade/211718f7a36541819d1244c0e2ee6f08"/>
   </a>
@@ -58,6 +58,8 @@ If you are using [vcpkg](https://github.com/Microsoft/vcpkg) on your project for
 If you are using [cget](https://cget.readthedocs.io/en/latest/), you can install the latest development version with `cget install pantor/inja`. A specific version can be installed with `cget install pantor/inja@v2.1.0`.
 
 On macOS, you can install inja via [Homebrew](https://formulae.brew.sh/formula/inja#default) and `brew install inja`.
+
+If you are using [conda](https://docs.conda.io/en/latest/), you can install the latest version from [conda-forge](https://anaconda.org/conda-forge/inja) with `conda install -c conda-forge inja`.
 
 ## Tutorial
 
@@ -194,7 +196,10 @@ Inja will throw an `inja::RenderError` if an included file is not found. To disa
 Variables can also be defined within the template using the set statment.
 ```.cpp
 render("{% set new_hour=23 %}{{ new_hour }}pm", data); // "23pm"
+render("{% set time.start=18 %}{{ time.start }}pm", data); // using json pointers
 ```
+
+Assignments only set the value within the rendering context; they do not modify the json object passed into the `render` call.
 
 ### Functions
 
@@ -219,6 +224,10 @@ render("{{ last(guests) }} was last.", data); // "Patir was last."
 render("{{ sort([3,2,1]) }}", data); // "[1,2,3]"
 render("{{ sort(guests) }}", data); // "[\"Jeff\", \"Patrick\", \"Tom\"]"
 
+// Join a list with a separator
+render("{{ join([1,2,3], \" + \") }}", data); // "1 + 2 + 3"
+render("{{ join(guests, \", \") }}", data); // "Jeff, Patrick, Tom"
+
 // Round numbers to a given precision
 render("{{ round(3.1415, 0) }}", data); // 3
 render("{{ round(3.1415, 3) }}", data); // 3.142
@@ -240,6 +249,9 @@ render("{{ float(\"1.8\") > 2 }}", data); // false
 render("Hello {{ default(neighbour, \"my friend\") }}!", data); // "Hello Peter!"
 render("Hello {{ default(colleague, \"my friend\") }}!", data); // "Hello my friend!"
 
+// Access an objects value dynamically
+render("{{ at(time, \"start\") }} to {{ time.end }}", data); // "16 to 22"
+
 // Check if a key exists in an object
 render("{{ exists(\"guests\") }}", data); // "true"
 render("{{ exists(\"city\") }}", data); // "false"
@@ -251,25 +263,6 @@ render("{{ isString(neighbour) }}", data); // "true"
 render("{{ isArray(guests) }}", data); // "true"
 // Implemented type checks: isArray, isBoolean, isFloat, isInteger, isNumber, isObject, isString,
 ```
-
-### Whitespace Control
-
-In the default configuration, no whitespace is removed while rendering the file. To support a more readable template style, you can configure the environment to control whitespaces before and after a statement automatically. While enabling `set_trim_blocks` removes the first newline after a statement, `set_lstrip_blocks` strips tabs and spaces from the beginning of a line to the start of a block.
-
-```.cpp
-Environment env;
-env.set_trim_blocks(true);
-env.set_lstrip_blocks(true);
-```
-
-With both `trim_blocks` and `lstrip_blocks` enabled, you can put statements on their own lines. Furthermore, you can also strip whitespaces for both statements and expressions by hand. If you add a minus sign (`-`) to the start or end, the whitespaces before or after that block will be removed:
-
-```.cpp
-render("Hello       {{- name -}}     !", data); // "Hello Inja!"
-render("{% if neighbour in guests -%}   I was there{% endif -%}   !", data); // Renders without any whitespaces
-```
-
-Stripping behind a statement or expression also removes any newlines.
 
 ### Callbacks
 
@@ -314,6 +307,61 @@ env.add_void_callback("log", 1, [greet](Arguments args) {
 env.render("{{ log(neighbour) }}", data); // Prints nothing to result, only to cout...
 ```
 
+### Template Inheritance
+
+Template inheritance allows you to build a base *skeleton* template that contains all the common elements and defines blocks that child templates can override. Lets show an example: The base template
+```.html
+<!DOCTYPE html>
+<html>
+<head>
+  {% block head %}
+  <link rel="stylesheet" href="style.css" />
+  <title>{% block title %}{% endblock %} - My Webpage</title>
+  {% endblock %}
+</head>
+<body>
+  <div id="content">{% block content %}{% endblock %}</div>
+</body>
+</html>
+```
+contains three `blocks` that child templates can fill in. The child template
+```.html
+{% extends "base.html" %}
+{% block title %}Index{% endblock %}
+{% block head %}
+  {{ super() }}
+  <style type="text/css">
+    .important { color: #336699; }
+  </style>
+{% endblock %}
+{% block content %}
+  <h1>Index</h1>
+  <p class="important">
+    Welcome to my blog!
+  </p>
+{% endblock %}
+```
+calls a parent template with the `extends` keyword; it should be the first element in the template. It is possible to render the contents of the parent block by calling `super()`. In the case of multiple levels of `{% extends %}`, super references may be called with an argument (e.g. `super(2)`) to skip levels in the inheritance tree.
+
+### Whitespace Control
+
+In the default configuration, no whitespace is removed while rendering the file. To support a more readable template style, you can configure the environment to control whitespaces before and after a statement automatically. While enabling `set_trim_blocks` removes the first newline after a statement, `set_lstrip_blocks` strips tabs and spaces from the beginning of a line to the start of a block.
+
+```.cpp
+Environment env;
+env.set_trim_blocks(true);
+env.set_lstrip_blocks(true);
+```
+
+With both `trim_blocks` and `lstrip_blocks` enabled, you can put statements on their own lines. Furthermore, you can also strip whitespaces for both statements and expressions by hand. If you add a minus sign (`-`) to the start or end, the whitespaces before or after that block will be removed:
+
+```.cpp
+render("Hello       {{- name -}}     !", data); // "Hello Inja!"
+render("{% if neighbour in guests -%}   I was there{% endif -%}   !", data); // Renders without any whitespaces
+```
+
+Stripping behind a statement or expression also removes any newlines.
+
 ### Comments
 
 Comments can be written with the `{# ... #}` syntax.
@@ -330,8 +378,8 @@ Inja uses exceptions to handle ill-formed template input. However, exceptions ca
 
 Inja uses `string_view` from C++17, but includes the [polyfill](https://github.com/martinmoene/string-view-lite) from martinmoene. This way, the minimum version is C++11. Currently, the following compilers are tested:
 
-- GCC 4.8 - 9 (and possibly later)
-- Clang 3.5 - 9 (and possibly later)
+- GCC 5 - 11 (and possibly later)
+- Clang 3.8 - 11 (and possibly later)
 - Microsoft Visual C++ 2016 - 2019 (and possibly later)
 
 The unit tests fail to compile with GCC 4.8 but should just work fine. A complete list of supported compiler / os versions can be found in the [CI definition](https://github.com/pantor/inja/blob/master/.github/workflows/ci.yml).

@@ -36,8 +36,11 @@ dist
 .coveralls.yml
 
 .vscode
+.vs
 
 doc/html
 doc/latex
+
+__pycache__
 
 examples

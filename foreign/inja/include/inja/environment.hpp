@@ -1,5 +1,3 @@
-// Copyright (c) 2019 Pantor. All rights reserved.
-
 #ifndef INCLUDE_INJA_ENVIRONMENT_HPP_
 #define INCLUDE_INJA_ENVIRONMENT_HPP_
 
@@ -73,7 +71,9 @@ public:
   /// Sets the opener and closer for template comments
   void set_comment(const std::string &open, const std::string &close) {
     lexer_config.comment_open = open;
+    lexer_config.comment_open_force_lstrip = open + "-";
     lexer_config.comment_close = close;
+    lexer_config.comment_close_force_rstrip = "-" + close;
     lexer_config.update_open_chars();
   }
 

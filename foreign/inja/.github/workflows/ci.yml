@@ -16,13 +16,13 @@ jobs:
       fail-fast: false
       matrix:
         name: [
-          ubuntu-18.04-gcc-4.9,
           ubuntu-18.04-gcc-5,
           ubuntu-18.04-gcc-6,
           ubuntu-18.04-gcc-7,
           ubuntu-18.04-gcc-8,
           ubuntu-18.04-gcc-9,
-          ubuntu-18.04-clang-3.5,
+          ubuntu-20.04-gcc-10,
+          ubuntu-20.04-gcc-11,
           ubuntu-18.04-clang-3.8,
           ubuntu-18.04-clang-4.0,
           ubuntu-18.04-clang-5.0,
@@ -30,6 +30,9 @@ jobs:
           ubuntu-18.04-clang-7,
           ubuntu-18.04-clang-8,
           ubuntu-20.04-clang-9,
+          ubuntu-20.04-clang-10,
+          ubuntu-20.04-clang-11,
+          ubuntu-20.04-clang-11-no-exceptions,
           windows-2016-cl,
           windows-2016-clang-cl,
           windows-2016-clang,
@@ -46,11 +49,6 @@ jobs:
         ]
 
         include:
-          - name: ubuntu-18.04-gcc-4.9
-            os: ubuntu-18.04
-            compiler: gcc
-            version: "4.9"
-
           - name: ubuntu-18.04-gcc-5
             os: ubuntu-18.04
             compiler: gcc
@@ -76,10 +74,15 @@ jobs:
             compiler: gcc
             version: "9"
 
-          - name: ubuntu-18.04-clang-3.5
-            os: ubuntu-18.04
-            compiler: clang
-            version: "3.5"
+          - name: ubuntu-20.04-gcc-10
+            os: ubuntu-20.04
+            compiler: gcc
+            version: "10"
+
+          - name: ubuntu-20.04-gcc-11
+            os: ubuntu-20.04
+            compiler: gcc
+            version: "11"
 
           - name: ubuntu-18.04-clang-3.8
             os: ubuntu-18.04
@@ -115,6 +118,22 @@ jobs:
             os: ubuntu-20.04
             compiler: clang
             version: "9"
+
+          - name: ubuntu-20.04-clang-10
+            os: ubuntu-20.04
+            compiler: clang
+            version: "10"
+
+          - name: ubuntu-20.04-clang-11
+            os: ubuntu-20.04
+            compiler: clang
+            version: "11"
+
+          - name: ubuntu-20.04-clang-11-no-exceptions
+            os: ubuntu-20.04
+            compiler: clang
+            version: "11"
+            cmake_vars: "-DCMAKE_CXX_FLAGS=-fno-exceptions -DBUILD_TESTING=OFF -DBUILD_BENCHMARK=ON"
 
           - name: windows-2016-cl
             os: windows-2016
@@ -174,7 +193,7 @@ jobs:
             version: "12.2"
 
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
 
       - name: Install (Linux)
         if: runner.os == 'Linux'
@@ -189,7 +208,7 @@ jobs:
           
           sudo apt-get update
           # libc6-dbg:i386 is required for running valgrind on x86.
-          sudo apt-get install -y ninja-build valgrind libc6-dbg:i386
+          sudo apt-get install -y ninja-build valgrind libc6-dbg:i386 -o APT::Immediate-Configure=0
           if [ "${{ matrix.compiler }}" = "gcc" ]; then
             sudo apt-get install -y g++-${{ matrix.version }} g++-${{ matrix.version }}-multilib
             echo "CC=gcc-${{ matrix.version }}" >> $GITHUB_ENV
@@ -256,6 +275,6 @@ jobs:
       - name: Build & Test Release
         run: |
           cmake -E remove_directory build
-          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release ${{ matrix.cmake_vars }}
           cmake --build build -j2
           cd build && ctest -j2 --output-on-failure

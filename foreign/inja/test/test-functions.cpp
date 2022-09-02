@@ -70,6 +70,8 @@ TEST_CASE("functions") {
   SUBCASE("at") {
     CHECK(env.render("{{ at(names, 0) }}", data) == "Jeff");
     CHECK(env.render("{{ at(names, i) }}", data) == "Seb");
+    CHECK(env.render("{{ at(brother, \"name\") }}", data) == "Chris");
+    CHECK(env.render("{{ at(at(brother, \"daughters\"), 0) }}", data) == "Maria");
     // CHECK(env.render("{{ at(names, 45) }}", data) == "Jeff");
   }
 
@@ -86,7 +88,7 @@ TEST_CASE("functions") {
   }
 
   SUBCASE("round") {
-    CHECK(env.render("{{ round(4, 0) }}", data) == "4.0");
+    CHECK(env.render("{{ round(4, 0) }}", data) == "4");
     CHECK(env.render("{{ round(temperature, 2) }}", data) == "25.68");
     // CHECK_THROWS_WITH( env.render("{{ round(name, 2) }}", data), "[inja.exception.json_error]
     // [json.exception.type_error.302] type must be number, but is string" );
@@ -157,7 +159,7 @@ TEST_CASE("functions") {
     CHECK(env.render("{{ exists(\"zipcode\") }}", data) == "false");
     CHECK(env.render("{{ exists(name) }}", data) == "false");
     CHECK(env.render("{{ exists(property) }}", data) == "true");
-
+    
     // CHECK(env.render("{{ exists(\"keywords\") and length(keywords) > 0 }}", data) == "false");
   }
 
@@ -170,6 +172,11 @@ TEST_CASE("functions") {
                       "[inja.exception.render_error] (at 1:13) variable 'sister' not found");
     CHECK_THROWS_WITH(env.render("{{ existsIn(brother, sister) }}", data),
                       "[inja.exception.render_error] (at 1:22) variable 'sister' not found");
+  }
+
+  SUBCASE("join") {
+    CHECK(env.render("{{ join(names, \" | \") }}", data) == "Jeff | Seb | Peter | Tom");
+    CHECK(env.render("{{ join(vars, \", \") }}", data) == "2, 3, 4, 0, -1, -2, -3");
   }
 
   SUBCASE("isType") {
@@ -206,7 +213,7 @@ TEST_CASE("callbacks") {
   });
 
   std::string greet = "Hello";
-  env.add_callback("double-greetings", 0, [greet](inja::Arguments args) { return greet + " " + greet + "!"; });
+  env.add_callback("double-greetings", 0, [greet](inja::Arguments) { return greet + " " + greet + "!"; });
 
   env.add_callback("multiply", 2, [](inja::Arguments args) {
     double number1 = args.at(0)->get<double>();
@@ -226,11 +233,11 @@ TEST_CASE("callbacks") {
     return number1.length();
   });
 
-  env.add_void_callback("log", 1, [](inja::Arguments args) {
-    int a = 2;
+  env.add_void_callback("log", 1, [](inja::Arguments) {
+    
   });
 
-  env.add_callback("multiply", 0, [](inja::Arguments args) { return 1.0; });
+  env.add_callback("multiply", 0, [](inja::Arguments) { return 1.0; });
 
   CHECK(env.render("{{ double(age) }}", data) == "56");
   CHECK(env.render("{{ half(age) }}", data) == "14");
@@ -282,4 +289,5 @@ TEST_CASE("combinations") {
   CHECK(env.render("{{ not true }}", data) == "false");
   CHECK(env.render("{{ not (true) }}", data) == "false");
   CHECK(env.render("{{ true or (true or true) }}", data) == "true");
+  CHECK(env.render("{{ at(list_of_objects, 1).b }}", data) == "3");
 }

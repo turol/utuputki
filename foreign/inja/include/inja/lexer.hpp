@@ -1,5 +1,3 @@
-// Copyright (c) 2020 Pantor. All rights reserved.
-
 #ifndef INCLUDE_INJA_LEXER_HPP_
 #define INCLUDE_INJA_LEXER_HPP_
 
@@ -28,6 +26,7 @@ class Lexer {
     StatementStartForceLstrip,
     StatementBody,
     CommentStart,
+    CommentStartForceLstrip,
     CommentBody,
   };
 
@@ -51,7 +50,7 @@ class Lexer {
     if (tok_start >= m_in.size()) {
       return make_token(Token::Kind::Eof);
     }
-    char ch = m_in[tok_start];
+    const char ch = m_in[tok_start];
     if (ch == ' ' || ch == '\t' || ch == '\r') {
       tok_start += 1;
       goto again;
@@ -61,7 +60,7 @@ class Lexer {
     if (!close_trim.empty() && inja::string_view::starts_with(m_in.substr(tok_start), close_trim)) {
       state = State::Text;
       pos = tok_start + close_trim.size();
-      Token tok = make_token(closeKind);
+      const Token tok = make_token(closeKind);
       skip_whitespaces_and_newlines();
       return tok;
     }
@@ -69,7 +68,7 @@ class Lexer {
     if (inja::string_view::starts_with(m_in.substr(tok_start), close)) {
       state = State::Text;
       pos = tok_start + close.size();
-      Token tok = make_token(closeKind);
+      const Token tok = make_token(closeKind);
       if (trim) {
         skip_whitespaces_and_first_newline();
       }
@@ -88,7 +87,7 @@ class Lexer {
       return scan_id();
     }
 
-    MinusState current_minus_state = minus_state;
+    const MinusState current_minus_state = minus_state;
     if (minus_state == MinusState::Operator) {
       minus_state = MinusState::Number;
     }
@@ -183,7 +182,7 @@ class Lexer {
       if (pos >= m_in.size()) {
         break;
       }
-      char ch = m_in[pos];
+      const char ch = m_in[pos];
       if (!std::isalnum(ch) && ch != '.' && ch != '/' && ch != '_' && ch != '-') {
         break;
       }
@@ -197,7 +196,7 @@ class Lexer {
       if (pos >= m_in.size()) {
         break;
       }
-      char ch = m_in[pos];
+      const char ch = m_in[pos];
       // be very permissive in lexer (we'll catch errors when conversion happens)
       if (!std::isdigit(ch) && ch != '.' && ch != 'e' && ch != 'E' && ch != '+' && ch != '-') {
         break;
@@ -213,7 +212,7 @@ class Lexer {
       if (pos >= m_in.size()) {
         break;
       }
-      char ch = m_in[pos++];
+      const char ch = m_in[pos++];
       if (ch == '\\') {
         escape = true;
       } else if (!escape && ch == m_in[tok_start]) {
@@ -243,7 +242,7 @@ class Lexer {
     }
 
     if (pos < m_in.size()) {
-      char ch = m_in[pos];
+      const char ch = m_in[pos];
       if (ch == '\n') {
         pos += 1;
       } else if (ch == '\r') {
@@ -258,7 +257,7 @@ class Lexer {
   static nonstd::string_view clear_final_line_if_whitespace(nonstd::string_view text) {
     nonstd::string_view result = text;
     while (!result.empty()) {
-      char ch = result.back();
+      const char ch = result.back();
       if (ch == ' ' || ch == '\t') {
         result.remove_suffix(1);
       } else if (ch == '\n' || ch == '\r') {
@@ -302,7 +301,7 @@ public:
     default:
     case State::Text: {
       // fast-scan to first open character
-      size_t open_start = m_in.substr(pos).find_first_of(config.open_chars);
+      const size_t open_start = m_in.substr(pos).find_first_of(config.open_chars);
       if (open_start == nonstd::string_view::npos) {
         // didn't find open, return remaining text as text token
         pos = m_in.size();
@@ -331,8 +330,13 @@ public:
           must_lstrip = config.lstrip_blocks;
         }
       } else if (inja::string_view::starts_with(open_str, config.comment_open)) {
-        state = State::CommentStart;
-        must_lstrip = config.lstrip_blocks;
+        if (inja::string_view::starts_with(open_str, config.comment_open_force_lstrip)) {
+          state = State::CommentStartForceLstrip;
+          must_lstrip = true;
+        } else {
+          state = State::CommentStart;
+          must_lstrip = config.lstrip_blocks;
+        }
       } else if ((pos == 0 || m_in[pos - 1] == '\n') && inja::string_view::starts_with(open_str, config.line_statement)) {
         state = State::LineStart;
       } else {
@@ -385,6 +389,11 @@ public:
       pos += config.comment_open.size();
       return make_token(Token::Kind::CommentOpen);
     }
+    case State::CommentStartForceLstrip: {
+      state = State::CommentBody;
+      pos += config.comment_open_force_lstrip.size();
+      return make_token(Token::Kind::CommentOpen);
+    }
     case State::ExpressionBody:
       return scan_body(config.expression_close, Token::Kind::ExpressionClose, config.expression_close_force_rstrip);
     case State::LineBody:
@@ -393,16 +402,21 @@ public:
       return scan_body(config.statement_close, Token::Kind::StatementClose, config.statement_close_force_rstrip, config.trim_blocks);
     case State::CommentBody: {
       // fast-scan to comment close
-      size_t end = m_in.substr(pos).find(config.comment_close);
+      const size_t end = m_in.substr(pos).find(config.comment_close);
       if (end == nonstd::string_view::npos) {
         pos = m_in.size();
         return make_token(Token::Kind::Eof);
       }
+
+      // Check for trim pattern
+      const bool must_rstrip = inja::string_view::starts_with(m_in.substr(pos + end - 1), config.comment_close_force_rstrip);
+
       // return the entire comment in the close token
       state = State::Text;
       pos += end + config.comment_close.size();
       Token tok = make_token(Token::Kind::CommentClose);
-      if (config.trim_blocks) {
+
+      if (must_rstrip || config.trim_blocks) {
         skip_whitespaces_and_first_newline();
       }
       return tok;

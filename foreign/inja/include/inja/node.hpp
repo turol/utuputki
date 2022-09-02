@@ -1,5 +1,3 @@
-// Copyright (c) 2020 Pantor. All rights reserved.
-
 #ifndef INCLUDE_INJA_NODE_HPP_
 #define INCLUDE_INJA_NODE_HPP_
 
@@ -28,11 +26,15 @@ class ForArrayStatementNode;
 class ForObjectStatementNode;
 class IfStatementNode;
 class IncludeStatementNode;
+class ExtendsStatementNode;
+class BlockStatementNode;
 class SetStatementNode;
 
 
 class NodeVisitor {
 public:
+  virtual ~NodeVisitor() = default;
+
   virtual void visit(const BlockNode& node) = 0;
   virtual void visit(const TextNode& node) = 0;
   virtual void visit(const ExpressionNode& node) = 0;
@@ -46,6 +48,8 @@ public:
   virtual void visit(const ForObjectStatementNode& node) = 0;
   virtual void visit(const IfStatementNode& node) = 0;
   virtual void visit(const IncludeStatementNode& node) = 0;
+  virtual void visit(const ExtendsStatementNode& node) = 0;
+  virtual void visit(const BlockStatementNode& node) = 0;
   virtual void visit(const SetStatementNode& node) = 0;
 };
 
@@ -59,7 +63,7 @@ public:
   size_t pos;
 
   AstNode(size_t pos) : pos(pos) { }
-  virtual ~AstNode() { };
+  virtual ~AstNode() { }
 };
 
 
@@ -144,76 +148,94 @@ public:
 
   std::string name;
   int number_args; // Should also be negative -> -1 for unknown number
+  std::vector<std::shared_ptr<ExpressionNode>> arguments;
   CallbackFunction callback;
 
   explicit FunctionNode(nonstd::string_view name, size_t pos) : ExpressionNode(pos), precedence(8), associativity(Associativity::Left), operation(Op::Callback), name(name), number_args(1) { }
   explicit FunctionNode(Op operation, size_t pos) : ExpressionNode(pos), operation(operation), number_args(1) {
     switch (operation) {
       case Op::Not: {
+        number_args = 1;
         precedence = 4;
         associativity = Associativity::Left;
       } break;
       case Op::And: {
+        number_args = 2;
         precedence = 1;
         associativity = Associativity::Left;
       } break;
       case Op::Or: {
+        number_args = 2;
         precedence = 1;
         associativity = Associativity::Left;
       } break;
       case Op::In: {
+        number_args = 2;
         precedence = 2;
         associativity = Associativity::Left;
       } break;
       case Op::Equal: {
+        number_args = 2;
         precedence = 2;
         associativity = Associativity::Left;
       } break;
       case Op::NotEqual: {
+        number_args = 2;
         precedence = 2;
         associativity = Associativity::Left;
       } break;
       case Op::Greater: {
+        number_args = 2;
         precedence = 2;
         associativity = Associativity::Left;
       } break;
       case Op::GreaterEqual: {
+        number_args = 2;
         precedence = 2;
         associativity = Associativity::Left;
       } break;
       case Op::Less: {
+        number_args = 2;
         precedence = 2;
         associativity = Associativity::Left;
       } break;
       case Op::LessEqual: {
+        number_args = 2;
         precedence = 2;
         associativity = Associativity::Left;
       } break;
       case Op::Add: {
+        number_args = 2;
         precedence = 3;
         associativity = Associativity::Left;
       } break;
       case Op::Subtract: {
+        number_args = 2;
         precedence = 3;
         associativity = Associativity::Left;
       } break;
       case Op::Multiplication: {
+        number_args = 2;
         precedence = 4;
         associativity = Associativity::Left;
       } break;
       case Op::Division: {
+        number_args = 2;
         precedence = 4;
         associativity = Associativity::Left;
       } break;
       case Op::Power: {
+        number_args = 2;
         precedence = 5;
         associativity = Associativity::Right;
       } break;
       case Op::Modulo: {
+        number_args = 2;
         precedence = 4;
         associativity = Associativity::Left;
       } break;
       case Op::AtId: {
+        number_args = 2;
         precedence = 8;
         associativity = Associativity::Left;
       } break;
@@ -231,7 +253,7 @@ public:
 
 class ExpressionListNode : public AstNode {
 public:
-  std::vector<std::shared_ptr<ExpressionNode>> rpn_output;
+  std::shared_ptr<ExpressionNode> root;
 
   explicit ExpressionListNode() : AstNode(0) { }
   explicit ExpressionListNode(size_t pos) : AstNode(pos) { }
@@ -308,6 +330,30 @@ public:
 
   void accept(NodeVisitor& v) const {
     v.visit(*this);
+  }
+};
+
+class ExtendsStatementNode : public StatementNode {
+public:
+  const std::string file;
+
+  explicit ExtendsStatementNode(const std::string& file, size_t pos) : StatementNode(pos), file(file) { }
+
+  void accept(NodeVisitor& v) const {
+    v.visit(*this);
+  };
+};
+
+class BlockStatementNode : public StatementNode {
+public:
+  const std::string name;
+  BlockNode block;
+  BlockNode *const parent;
+
+  explicit BlockStatementNode(BlockNode *const parent, const std::string& name, size_t pos) : StatementNode(pos), name(name), parent(parent) { }
+
+  void accept(NodeVisitor& v) const {
+    v.visit(*this);
   };
 };
 
@@ -320,7 +366,7 @@ public:
 
   void accept(NodeVisitor& v) const {
     v.visit(*this);
-  };
+  }
 };
 
 } // namespace inja
