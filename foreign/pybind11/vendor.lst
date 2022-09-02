@@ -2,6 +2,7 @@
 .clang-format
 .clang-tidy
 .cmake-format.yaml
+.gitattributes
 .github/CODEOWNERS
 .github/CONTRIBUTING.md
 .github/ISSUE_TEMPLATE/bug-report.yml
@@ -9,6 +10,7 @@
 .github/dependabot.yml
 .github/labeler.yml
 .github/labeler_merged.yml
+.github/matchers/pylint.json
 .github/pull_request_template.md
 .github/workflows/ci.yml
 .github/workflows/configure.yml
@@ -25,7 +27,7 @@ MANIFEST.in
 README.rst
 docs/Doxyfile
 docs/Makefile
-docs/_static/theme_overrides.css
+docs/_static/css/custom.css
 docs/advanced/cast/chrono.rst
 docs/advanced/cast/custom.rst
 docs/advanced/cast/eigen.rst
@@ -96,11 +98,9 @@ noxfile.py
 pybind11/__init__.py
 pybind11/__main__.py
 pybind11/_version.py
-pybind11/_version.pyi
 pybind11/commands.py
 pybind11/py.typed
 pybind11/setup_helpers.py
-pybind11/setup_helpers.pyi
 pyproject.toml
 setup.cfg
 setup.py
@@ -108,6 +108,7 @@ tests/CMakeLists.txt
 tests/conftest.py
 tests/constructor_stats.h
 tests/cross_module_gil_utils.cpp
+tests/cross_module_interleaved_error_already_set.cpp
 tests/env.py
 tests/extra_python_package/pytest.ini
 tests/extra_python_package/test_files.py

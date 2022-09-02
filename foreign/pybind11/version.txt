@@ -1,5 +1,7 @@
-commit 914c06fb252b6cc3727d0eedab6736e88a3fcb01
-Author: Henry Schreiner <henryschreineriii@gmail.com>
-Date:   Wed Mar 30 23:12:13 2022 -0400
+commit aa304c9c7d725ffb9d10af08a3b34cb372307020
+Author: Henry Schreiner <HenrySchreinerIII@gmail.com>
+Date:   Fri Jul 15 15:47:47 2022 -0500
 
-    chore: set to version 2.9.2
+    chore: preapre for 2.10.0 release (#4068)
+    
+    Signed-off-by: Henry Schreiner <henryschreineriii@gmail.com>
