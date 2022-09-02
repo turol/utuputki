@@ -34,7 +34,7 @@ embed_MODULES:=fmt
 embed_SRC:=$(foreach f, embed.cpp Utils.cpp, $(dir)/$(f))
 
 
-utuputki_MODULES:=civetweb date fmt libvlcpp python sqlpp11 cxxurl
+utuputki_MODULES:=civetweb date fmt libvlcpp python sqlite3 cxxurl
 utuputki_SRC:=$(SRC_$(d))
 
 

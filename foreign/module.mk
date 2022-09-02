@@ -8,7 +8,6 @@ SUBDIRS:= \
 	CxxUrl \
 	date \
 	fmt \
-	sqlpp11-connector-sqlite3 \
 	# empty line
 
 DIRS:=$(addprefix $(d)/,$(SUBDIRS))

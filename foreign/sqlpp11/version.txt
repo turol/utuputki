@@ -1,6 +1,6 @@
-commit 085713d4d301aeb58e7d14f44cfac6ce35fe2e77
-Merge: e3ab5e5 123bdb8
+commit 2bc89b34ad3cc37b6bca9a44a3529ff2d8fe211f
+Merge: 4f99894 181cc5f
 Author: Roland Bock <rbock@eudoxos.de>
-Date:   Sun Aug 23 07:45:17 2020 +0200
+Date:   Sat Dec 18 10:52:54 2021 +0100
 
-    Merge branch 'release/0.60'
+    Merge branch 'release/0.61'

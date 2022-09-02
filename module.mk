@@ -66,7 +66,6 @@ CFLAGS+=-isystem$(TOPDIR)/foreign/libvlcpp
 CFLAGS+=-isystem$(TOPDIR)/foreign/nlohmann_json/single_include
 CFLAGS+=-isystem$(TOPDIR)/foreign/pybind11/include
 CFLAGS+=-isystem$(TOPDIR)/foreign/sqlpp11/include
-CFLAGS+=-isystem$(TOPDIR)/foreign/sqlpp11-connector-sqlite3/include
 CFLAGS+=-isystem$(TOPDIR)/foreign/tartanllama_optional
 CFLAGS+=-isystem$(TOPDIR)/foreign/CxxUrl
 CFLAGS+=-isystem$(TOPDIR)/foreign/LURLParser
