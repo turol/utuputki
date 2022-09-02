@@ -15,6 +15,7 @@
 .github/workflows/format.yml
 .github/workflows/labeler.yml
 .github/workflows/pip.yml
+.github/workflows/upstream.yml
 .gitignore
 .pre-commit-config.yaml
 .readthedocs.yml
@@ -160,6 +161,7 @@ tests/test_embed/catch.cpp
 tests/test_embed/external_module.cpp
 tests/test_embed/test_interpreter.cpp
 tests/test_embed/test_interpreter.py
+tests/test_embed/test_trampoline.py
 tests/test_enum.cpp
 tests/test_enum.py
 tests/test_eval.cpp
