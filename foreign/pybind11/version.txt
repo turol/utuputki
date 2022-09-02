@@ -1,5 +1,5 @@
-commit ffa346860b306c9bbfb341aed9c14c067751feb8
+commit 914c06fb252b6cc3727d0eedab6736e88a3fcb01
 Author: Henry Schreiner <henryschreineriii@gmail.com>
-Date:   Wed Feb 2 17:34:15 2022 -0500
+Date:   Wed Mar 30 23:12:13 2022 -0400
 
-    chore: bump to 2.9.1
+    chore: set to version 2.9.2
