@@ -1,4 +1,5 @@
 .appveyor.yml
+.clang-format
 .clang-tidy
 .cmake-format.yaml
 .github/CONTRIBUTING.md
@@ -205,12 +206,15 @@ tests/test_union.cpp
 tests/test_union.py
 tests/test_virtual_functions.cpp
 tests/test_virtual_functions.py
+tests/valgrind-numpy-scipy.supp
+tests/valgrind-python.supp
 tools/FindCatch.cmake
 tools/FindEigen3.cmake
 tools/FindPythonLibsNew.cmake
 tools/check-style.sh
 tools/cmake_uninstall.cmake.in
 tools/libsize.py
+tools/make_changelog.py
 tools/pybind11Common.cmake
 tools/pybind11Config.cmake.in
 tools/pybind11NewTools.cmake
