@@ -10,35 +10,14 @@
 
 #pragma once
 
-#if defined(__INTEL_COMPILER)
-#  pragma warning push
-#  pragma warning disable 68    // integer conversion resulted in a change of sign
-#  pragma warning disable 186   // pointless comparison of unsigned integer with zero
-#  pragma warning disable 878   // incompatible exception specifications
-#  pragma warning disable 1334  // the "template" keyword used for syntactic disambiguation may only be used within a template
-#  pragma warning disable 1682  // implicit conversion of a 64-bit integral type to a smaller integral type (potential portability problem)
-#  pragma warning disable 1786  // function "strdup" was declared deprecated
-#  pragma warning disable 1875  // offsetof applied to non-POD (Plain Old Data) types is nonstandard
-#  pragma warning disable 2196  // warning #2196: routine is both "inline" and "noinline"
-#elif defined(_MSC_VER)
+#if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
 #  pragma warning(push)
 #  pragma warning(disable: 4100) // warning C4100: Unreferenced formal parameter
 #  pragma warning(disable: 4127) // warning C4127: Conditional expression is constant
-#  pragma warning(disable: 4512) // warning C4512: Assignment operator was implicitly defined as deleted
-#  pragma warning(disable: 4800) // warning C4800: 'int': forcing value to bool 'true' or 'false' (performance warning)
-#  pragma warning(disable: 4996) // warning C4996: The POSIX name for this item is deprecated. Instead, use the ISO C and C++ conformant name
-#  pragma warning(disable: 4702) // warning C4702: unreachable code
-#  pragma warning(disable: 4522) // warning C4522: multiple assignment operators specified
-#  pragma warning(disable: 4505) // warning C4505: 'PySlice_GetIndicesEx': unreferenced local function has been removed (PyPy only)
-#elif defined(__GNUG__) && !defined(__clang__)
+#elif defined(__GNUG__) && !defined(__clang__) && !defined(__INTEL_COMPILER)
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wunused-but-set-parameter"
-#  pragma GCC diagnostic ignored "-Wunused-but-set-variable"
-#  pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #  pragma GCC diagnostic ignored "-Wattributes"
-#  if __GNUC__ >= 7
-#    pragma GCC diagnostic ignored "-Wnoexcept-type"
-#  endif
 #endif
 
 #include "attr.h"
@@ -53,6 +32,8 @@
 #include <string>
 #include <utility>
 
+#include <string.h>
+
 #if defined(__cpp_lib_launder) && !(defined(_MSC_VER) && (_MSC_VER < 1914))
 #  define PYBIND11_STD_LAUNDER std::launder
 #  define PYBIND11_HAS_STD_LAUNDER 1
@@ -64,7 +45,25 @@
 #  include <cxxabi.h>
 #endif
 
+/* https://stackoverflow.com/questions/46798456/handling-gccs-noexcept-type-warning
+   This warning is about ABI compatibility, not code health.
+   It is only actually needed in a couple places, but apparently GCC 7 "generates this warning if
+   and only if the first template instantiation ... involves noexcept" [stackoverflow], therefore
+   it could get triggered from seemingly random places, depending on user code.
+   No other GCC version generates this warning.
+ */
+#if defined(__GNUC__) && __GNUC__ == 7
+#    pragma GCC diagnostic push
+#    pragma GCC diagnostic ignored "-Wnoexcept-type"
+#endif
+
 PYBIND11_NAMESPACE_BEGIN(PYBIND11_NAMESPACE)
+
+#if defined(_MSC_VER)
+#    define PYBIND11_COMPAT_STRDUP _strdup
+#else
+#    define PYBIND11_COMPAT_STRDUP strdup
+#endif
 
 /// Wraps an arbitrary C++ function/method/lambda function/.. into a callable Python object
 class cpp_function : public function {
@@ -263,7 +262,7 @@ protected:
                 std::free(s);
         }
         char *operator()(const char *s) {
-            auto t = strdup(s);
+            auto t = PYBIND11_COMPAT_STRDUP(s);
             strings.push_back(t);
             return t;
         }
@@ -301,7 +300,8 @@ protected:
                 a.descr = guarded_strdup(repr(a.value).cast<std::string>().c_str());
         }
 
-        rec->is_constructor = !strcmp(rec->name, "__init__") || !strcmp(rec->name, "__setstate__");
+        rec->is_constructor
+            = (strcmp(rec->name, "__init__") == 0) || (strcmp(rec->name, "__setstate__") == 0);
 
 #if !defined(NDEBUG) && !defined(PYBIND11_DISABLE_NEW_STYLE_INIT_WARNING)
         if (rec->is_constructor && !rec->is_new_style_constructor) {
@@ -507,7 +507,8 @@ protected:
         auto *func = (PyCFunctionObject *) m_ptr;
         std::free(const_cast<char *>(func->m_ml->ml_doc));
         // Install docstring if it's non-empty (when at least one option is enabled)
-        func->m_ml->ml_doc = signatures.empty() ? nullptr : strdup(signatures.c_str());
+        func->m_ml->ml_doc
+            = signatures.empty() ? nullptr : PYBIND11_COMPAT_STRDUP(signatures.c_str());
 
         if (rec->is_method) {
             m_ptr = PYBIND11_INSTANCE_METHOD_NEW(m_ptr, rec->scope.ptr());
@@ -1109,7 +1110,8 @@ protected:
             pybind11_fail("generic_type: cannot initialize type \"" + std::string(rec.name) +
                           "\": an object with that name is already defined");
 
-        if (rec.module_local ? get_local_type_info(*rec.type) : get_global_type_info(*rec.type))
+        if ((rec.module_local ? get_local_type_info(*rec.type) : get_global_type_info(*rec.type))
+            != nullptr)
             pybind11_fail("generic_type: type \"" + std::string(rec.name) +
                           "\" is already registered!");
 
@@ -1187,8 +1189,9 @@ protected:
     void def_property_static_impl(const char *name,
                                   handle fget, handle fset,
                                   detail::function_record *rec_func) {
-        const auto is_static = rec_func && !(rec_func->is_method && rec_func->scope);
-        const auto has_doc = rec_func && rec_func->doc && pybind11::options::show_user_defined_docstrings();
+        const auto is_static = (rec_func != nullptr) && !(rec_func->is_method && rec_func->scope);
+        const auto has_doc = (rec_func != nullptr) && (rec_func->doc != nullptr)
+                             && pybind11::options::show_user_defined_docstrings();
         auto property = handle((PyObject *) (is_static ? get_internals().static_property_type
                                                        : &PyProperty_Type));
         attr(name) = property(fget.ptr() ? fget : none(),
@@ -1508,7 +1511,7 @@ public:
            detail::process_attributes<Extra...>::init(extra..., rec_fget);
            if (rec_fget->doc && rec_fget->doc != doc_prev) {
               free(doc_prev);
-              rec_fget->doc = strdup(rec_fget->doc);
+              rec_fget->doc = PYBIND11_COMPAT_STRDUP(rec_fget->doc);
            }
         }
         if (rec_fset) {
@@ -1516,7 +1519,7 @@ public:
             detail::process_attributes<Extra...>::init(extra..., rec_fset);
             if (rec_fset->doc && rec_fset->doc != doc_prev) {
                 free(doc_prev);
-                rec_fset->doc = strdup(rec_fset->doc);
+                rec_fset->doc = PYBIND11_COMPAT_STRDUP(rec_fset->doc);
             }
             if (! rec_active) rec_active = rec_fset;
         }
@@ -2158,8 +2161,8 @@ inline function get_type_override(const void *this_ptr, const type_info *this_ty
        Unfortunately this doesn't work on PyPy. */
 #if !defined(PYPY_VERSION)
     PyFrameObject *frame = PyThreadState_Get()->frame;
-    if (frame && (std::string) str(frame->f_code->co_name) == name &&
-        frame->f_code->co_argcount > 0) {
+    if (frame != nullptr && (std::string) str(frame->f_code->co_name) == name
+        && frame->f_code->co_argcount > 0) {
         PyFrame_FastToLocals(frame);
         PyObject *self_caller = dict_getitem(
             frame->f_locals, PyTuple_GET_ITEM(frame->f_code->co_varnames, 0));
@@ -2313,6 +2316,10 @@ inline function get_overload(const T *this_ptr, const char *name) {
     PYBIND11_OVERRIDE_PURE(PYBIND11_TYPE(ret_type), PYBIND11_TYPE(cname), fn, __VA_ARGS__);
 
 PYBIND11_NAMESPACE_END(PYBIND11_NAMESPACE)
+
+#if defined(__GNUC__) && __GNUC__ == 7
+#    pragma GCC diagnostic pop // -Wnoexcept-type
+#endif
 
 #if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
 #  pragma warning(pop)
