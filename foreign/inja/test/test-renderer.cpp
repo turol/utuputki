@@ -1,9 +1,5 @@
 // Copyright (c) 2020 Pantor. All rights reserved.
 
-#include "doctest/doctest.h"
-#include "inja/inja.hpp"
-
-
 TEST_CASE("types") {
   inja::Environment env;
   json data;
@@ -16,6 +12,8 @@ TEST_CASE("types") {
   data["brother"]["daughter0"] = {{"name", "Maria"}};
   data["is_happy"] = true;
   data["is_sad"] = false;
+  data["@name"] = "@name";
+  data["$name"] = "$name";
   data["relatives"]["mother"] = "Maria";
   data["relatives"]["brother"] = "Chris";
   data["relatives"]["sister"] = "Jenny";
@@ -38,6 +36,8 @@ TEST_CASE("types") {
     CHECK(env.render("Hello {{ brother.name }}!", data) == "Hello Chris!");
     CHECK(env.render("Hello {{ brother.daughter0.name }}!", data) == "Hello Maria!");
     CHECK(env.render("{{ \"{{ no_value }}\" }}", data) == "{{ no_value }}");
+    CHECK(env.render("{{ @name }}", data) == "@name");
+    CHECK(env.render("{{ $name }}", data) == "$name");
 
     CHECK_THROWS_WITH(env.render("{{unknown}}", data), "[inja.exception.render_error] (at 1:3) variable 'unknown' not found");
   }

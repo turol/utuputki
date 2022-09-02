@@ -91,7 +91,7 @@ class Renderer : public NodeVisitor  {
 
   void throw_renderer_error(const std::string &message, const AstNode& node) {
     SourceLocation loc = get_source_location(current_template->content, node.pos);
-    throw RenderError(message, loc);
+    INJA_THROW(RenderError(message, loc));
   }
 
   template<size_t N, bool throw_not_found=true>
@@ -119,6 +119,10 @@ class Renderer : public NodeVisitor  {
 
   template<bool throw_not_found=true>
   Arguments get_argument_vector(size_t N, const AstNode& node) {
+    if (json_eval_stack.size() < N) {
+      throw_renderer_error("function needs " + std::to_string(N) + " variables, but has only found " + std::to_string(json_eval_stack.size()), node);
+    }
+
     Arguments result {N};
     for (size_t i = 0; i < N; i += 1) {
       result[N - i - 1] = json_eval_stack.top();

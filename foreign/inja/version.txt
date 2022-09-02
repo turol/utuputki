@@ -1,5 +1,5 @@
-commit dda31f44bb801f025538d8773f35c854fa3e0862
-Author: pantor <1885260+pantor@users.noreply.github.com>
-Date:   Mon Sep 28 18:06:23 2020 +0200
+commit 15b0b7f5e33e9fb1471d35218d2f66511f1ec4b7
+Author: pantor <lars.berscheid@online.de>
+Date:   Sat Jan 16 18:23:20 2021 +0100
 
-    Add homebrew
+    add gcc via choco

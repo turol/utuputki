@@ -1,9 +1,5 @@
 // Copyright (c) 2020 Pantor. All rights reserved.
 
-#include "doctest/doctest.h"
-#include "inja/inja.hpp"
-
-
 TEST_CASE("functions") {
   inja::Environment env;
 
@@ -161,6 +157,8 @@ TEST_CASE("functions") {
     CHECK(env.render("{{ exists(\"zipcode\") }}", data) == "false");
     CHECK(env.render("{{ exists(name) }}", data) == "false");
     CHECK(env.render("{{ exists(property) }}", data) == "true");
+
+    // CHECK(env.render("{{ exists(\"keywords\") and length(keywords) > 0 }}", data) == "false");
   }
 
   SUBCASE("existsIn") {

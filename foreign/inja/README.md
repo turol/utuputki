@@ -1,4 +1,4 @@
-[<div align="center"><img width="500" src="https://raw.githubusercontent.com/pantor/inja/master/doc/logo.jpg"></div>](https://github.com/pantor/inja/releases)
+[<div align="center"><img width="500" src="https://raw.githubusercontent.com/pantor/inja/master/doc/logo.svg?sanitize=true"></div>](https://github.com/pantor/inja/releases)
 
 <p align="center">
   <a href="https://github.com/pantor/inja/actions">
@@ -158,17 +158,17 @@ In a loop, the special variables `loop/index (number)`, `loop/index1 (number)`, 
 
 Conditions support the typical if, else if and else statements. Following conditions are for example possible:
 ```.cpp
-// Standard comparisons with variable
-render("{% if time.hour >= 20 %}…{% else if time.hour >= 18 %}…{% endif %}", data); // True
+// Standard comparisons with a variable
+render("{% if time.hour >= 20 %}Serve{% else if time.hour >= 18 %}Make{% endif %} dinner.", data); // Serve dinner.
 
 // Variable in list
-render("{% if neighbour in guests %}…{% endif %}", data); // True
+render("{% if neighbour in guests %}Turn up the music!{% endif %}", data); // Turn up the music!
 
 // Logical operations
-render("{% if guest_count < (3+2) and all_tired %}…{% else %}…{% endif %}", data); // True
+render("{% if guest_count < (3+2) and all_tired %}Sleepy...{% else %}Keep going...{% endif %}", data); // Sleepy...
 
 // Negations
-render("{% if not guest_count %}…{% endif %}", data); // True
+render("{% if not guest_count %}The End{% endif %}", data); // The End
 ```
 
 #### Includes
@@ -320,6 +320,11 @@ Comments can be written with the `{# ... #}` syntax.
 ```.cpp
 render("Hello{# Todo #}!", data); // "Hello!"
 ```
+
+### Exceptions
+
+Inja uses exceptions to handle ill-formed template input. However, exceptions can be switched off with either using the compiler flag `-fno-exceptions` or by defining the symbol `INJA_NOEXCEPTION`. In this case, exceptions are replaced by `abort()` calls.
+
 
 ## Supported compilers
 
