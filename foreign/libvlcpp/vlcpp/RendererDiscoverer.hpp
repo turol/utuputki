@@ -74,7 +74,7 @@ public:
         friend RendererDiscovererEventManager;
     };
 
-    RendererDiscoverer( Instance& instance, const std::string& name )
+    RendererDiscoverer( const Instance& instance, const std::string& name )
         : Internal( libvlc_renderer_discoverer_new( getInternalPtr<libvlc_instance_t>( instance ),
                                                     name.c_str() ), libvlc_renderer_discoverer_release )
     {
@@ -95,7 +95,7 @@ public:
         if ( m_eventManager == nullptr )
         {
             libvlc_event_manager_t* obj = libvlc_renderer_discoverer_event_manager( *this );
-            m_eventManager = std::make_shared<RendererDiscovererEventManager>( obj );
+            m_eventManager = std::make_shared<RendererDiscovererEventManager>( obj, *this );
         }
         return *m_eventManager;
     }

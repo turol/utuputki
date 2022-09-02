@@ -53,7 +53,7 @@ public:
      *
      * \param p_instance  libvlc instance
      */
-    MediaListPlayer(Instance& instance)
+    MediaListPlayer(const Instance& instance)
         : Internal{ libvlc_media_list_player_new( getInternalPtr<libvlc_instance_t>( instance ) ),
                     libvlc_media_list_player_release }
     {
@@ -76,7 +76,7 @@ public:
         if ( m_eventManager == nullptr )
         {
             libvlc_event_manager_t* obj = libvlc_media_list_player_event_manager(*this);
-            m_eventManager = std::make_shared<MediaListPlayerEventManager>( obj );
+            m_eventManager = std::make_shared<MediaListPlayerEventManager>( obj, *this );
         }
         return *m_eventManager;
     }
@@ -161,6 +161,15 @@ public:
                         getInternalPtr<libvlc_media_t>( md ) ) == 0;
     }
 
+#if LIBVLC_VERSION_INT >= LIBVLC_VERSION(4, 0, 0, 0)
+    /**
+     * Stop playing media list
+     */
+    void stopAsync()
+    {
+        libvlc_media_list_player_stop_async(*this);
+    }
+#else
     /**
      * Stop playing media list
      */
@@ -168,6 +177,7 @@ public:
     {
         libvlc_media_list_player_stop(*this);
     }
+#endif
 
     /**
      * Play next item from media list

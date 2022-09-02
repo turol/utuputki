@@ -75,13 +75,13 @@ public:
 
     explicit ModuleDescription( libvlc_module_description_t* c )
     {
-        if ( c->psz_name != NULL )
+        if ( c->psz_name != nullptr )
             m_name = c->psz_name;
-        if ( c->psz_shortname != NULL )
+        if ( c->psz_shortname != nullptr )
             m_shortname = c->psz_shortname;
-        if ( c->psz_longname != NULL )
+        if ( c->psz_longname != nullptr )
             m_longname = c->psz_longname;
-        if ( c->psz_help != NULL )
+        if ( c->psz_help != nullptr )
             m_help = c->psz_help;
     }
 
@@ -91,6 +91,312 @@ private:
     std::string m_longname;
     std::string m_help;
 };
+
+#if LIBVLC_VERSION_INT >= LIBVLC_VERSION(4, 0, 0, 0)
+
+///
+/// \brief The MediaTrack class describes a track
+///
+class MediaTrack : public Internal<libvlc_media_track_t>
+{
+public:
+    ///
+    /// \brief The Type enum indicates the type of a track
+    ///
+    enum class Type
+    {
+        Unknown = libvlc_track_unknown,
+        /// Audio track
+        Audio = libvlc_track_audio,
+        /// Video track
+        Video = libvlc_track_video,
+        /// Subtitle track (also called SPU sometimes)
+        Subtitle = libvlc_track_text,
+    };
+
+    ///
+    /// \brief The Orientation enum indicates the orientation of a video
+    ///
+    enum class Orientation
+    {
+        TopLeft,
+        TopRight,
+        BottomLeft,
+        BottomRight,
+        LeftTop,
+        LeftBottom,
+        RightTop,
+        RightBottom
+    };
+
+    ///
+    /// \brief The Projection enum indicates the projection of a video
+    ///
+    enum class Projection
+    {
+        Rectangular,
+        /// 360 spherical
+        Equirectangular,
+        CubemapLayoutStandard = 0x100
+    };
+
+#if !defined(_MSC_VER) || _MSC_VER >= 1900
+    constexpr static Type Unknown = Type::Unknown;
+    constexpr static Type Audio = Type::Audio;
+    constexpr static Type Video = Type::Video;
+    constexpr static Type Subtitle = Type::Subtitle;
+#else
+    const static Type Unknown = Type::Unknown;
+    const static Type Audio = Type::Audio;
+    const static Type Video = Type::Video;
+    const static Type Subtitle = Type::Subtitle;
+#endif
+
+    ///
+    /// \brief codec Returns the codec as a fourcc
+    ///
+    /// This is the fourcc will use to select a codec, but it might be an
+    /// interpretation of the original fourcc.
+    /// \see originalFourCC()
+    ///
+    uint32_t codec() const
+    {
+        return m_obj->i_codec;
+    }
+
+    ///
+    /// \brief originalFourCC Returns the fourcc as found in the file.
+    ///
+    /// VLC might chose to use a different fourcc internally.
+    /// For instance, AVC1 & H264 fourcc are (almost?) identical. VLC would
+    /// use H264 as the codec/fourcc, and store AVC1/H264 as the original fourcc
+    ///
+    uint32_t originalFourCC() const
+    {
+        return m_obj->i_original_fourcc;
+    }
+
+    ///
+    /// \brief id The track internal ID.
+    ///
+    /// This can't be assume to grow one by one monotonically.
+    ///
+    int32_t id() const
+    {
+        return m_obj->i_id;
+    }
+
+    ///
+    /// \brief type The track type
+    ///
+    /// \see MediaTrack::Type
+    ///
+    Type type() const
+    {
+        return static_cast<Type>( m_obj->i_type );
+    }
+
+    ///
+    /// \brief profile This track profile
+    ///
+    /// This might or might not be set, depending on the codec.
+    ///
+    int32_t profile() const
+    {
+        return m_obj->i_profile;
+    }
+
+    ///
+    /// \brief level This track level
+    ///
+    /// This might or might not be set, depending on the codec
+    ///
+    int32_t level() const
+    {
+        return m_obj->i_level;
+    }
+
+    ///
+    /// \brief bitrate This track bitrate, in bytes per second
+    /// \return
+    ///
+    uint32_t bitrate() const
+    {
+        return m_obj->i_bitrate;
+    }
+
+    ///
+    /// \brief language This track language, if available.
+    ///
+    std::string language() const
+    {
+        return m_obj->psz_language ? m_obj->psz_language : "";
+    }
+
+    ///
+    /// \brief description This track description
+    ///
+    std::string description() const
+    {
+        return m_obj->psz_description ? m_obj->psz_description : "";
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    /// Audio specific
+    ////////////////////////////////////////////////////////////////////////////
+
+    ///
+    /// \brief channels This track number of channels
+    ///
+    uint32_t channels() const
+    {
+        assert( m_obj->i_type == libvlc_track_audio );
+        return m_obj->audio->i_channels;
+    }
+
+    ///
+    /// \brief rate This track samplerate, in hertz (Hz)
+    ///
+    uint32_t rate() const
+    {
+        assert( m_obj->i_type == libvlc_track_audio );
+        return m_obj->audio->i_rate;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Video specific
+    ////////////////////////////////////////////////////////////////////////////
+
+    ///
+    /// \brief height This track video height
+    ///
+    uint32_t height() const
+    {
+        assert( m_obj->i_type == libvlc_track_video );
+        return m_obj->video->i_height;
+    }
+
+    ///
+    /// \brief width This track video width
+    ///
+    uint32_t width() const
+    {
+        assert( m_obj->i_type == libvlc_track_video );
+        return m_obj->video->i_width;
+    }
+
+    ///
+    /// \brief sarNum This track aspect ratio numerator
+    ///
+    /// \see sarDen
+    ///
+    uint32_t sarNum() const
+    {
+        assert( m_obj->i_type == libvlc_track_video );
+        return m_obj->video->i_sar_num;
+    }
+
+    ///
+    /// \brief sarDen This track aspect ratio denominator
+    ///
+    /// \see sarNum
+    ///
+    uint32_t sarDen() const
+    {
+        assert( m_obj->i_type == libvlc_track_video );
+        return m_obj->video->i_sar_den;
+    }
+
+    ///
+    /// \brief fpsNum This track frame per second numerator
+    ///
+    /// \see fpsDen
+    ///
+    uint32_t fpsNum() const
+    {
+        assert( m_obj->i_type == libvlc_track_video );
+        return m_obj->video->i_frame_rate_num;
+    }
+
+    ///
+    /// \brief fpsDen This track frame per second denominator
+    ///
+    /// \see fpsNum
+    ///
+    uint32_t fpsDen() const
+    {
+        assert( m_obj->i_type == libvlc_track_video );
+        return m_obj->video->i_frame_rate_den;
+    }
+
+    ///
+    /// \brief Orientation
+    ///
+    /// \see orientation
+    ///
+    Orientation orientation() const
+    {
+        assert( m_obj->i_type == libvlc_track_video );
+        return static_cast<Orientation>( m_obj->video->i_orientation );
+    }
+
+    ///
+    /// \brief Projection
+    ///
+    /// \see projection
+    ///
+    Projection projection() const
+    {
+        assert( m_obj->i_type == libvlc_track_video );
+        return static_cast<Projection>( m_obj->video->i_projection );
+    }
+
+    std::string idStr() const
+    {
+        return m_obj->psz_id ? m_obj->psz_id : "";
+    }
+
+    bool idStable() const
+    {
+        return m_obj->id_stable;
+    }
+
+    std::string name() const
+    {
+        return m_obj->psz_name ? m_obj->psz_name : "";
+    }
+
+    bool selected() const
+    {
+        return m_obj->selected;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Subtitles specific
+    ////////////////////////////////////////////////////////////////////////////
+
+    ///
+    /// \brief encoding Subtitles text encoding
+    ///
+    std::string encoding() const
+    {
+        assert( m_obj->i_type == libvlc_track_text );
+        return m_obj->subtitle->psz_encoding ? m_obj->subtitle->psz_encoding : "";
+    }
+
+    ///
+    /// \brief MediaTrack Construct a libvlc_media_track_t representation
+    /// \param c A valid media track
+    ///
+    /// \note The track will he held and released automatically.
+    ///
+    explicit MediaTrack(libvlc_media_track_t* c)
+        : Internal{ libvlc_media_track_hold( c ), libvlc_media_track_release }
+    {
+    }
+};
+
+#else
 
 ///
 /// \brief The MediaTrack class describes a track
@@ -103,13 +409,13 @@ public:
     ///
     enum class Type
     {
-        Unknown = -1,
+        Unknown = libvlc_track_unknown,
         /// Audio track
-        Audio,
+        Audio = libvlc_track_audio,
         /// Video track
-        Video,
+        Video = libvlc_track_video,
         /// Subtitle track (also called SPU sometimes)
-        Subtitle
+        Subtitle = libvlc_track_text,
     };
 
     ///
@@ -361,9 +667,9 @@ public:
         , m_level( c->i_level )
         , m_bitrate( c->i_bitrate )
     {
-        if ( c->psz_language != NULL )
+        if ( c->psz_language != nullptr )
             m_language = c->psz_language;
-        if ( c->psz_description != NULL )
+        if ( c->psz_description != nullptr )
             m_description = c->psz_description;
         switch ( c->i_type )
         {
@@ -387,7 +693,7 @@ public:
                 break;
             case libvlc_track_text:
                 m_type = Subtitle;
-                if ( c->subtitle->psz_encoding != NULL )
+                if ( c->subtitle->psz_encoding != nullptr )
                     m_encoding = c->subtitle->psz_encoding;
                 break;
             case libvlc_track_unknown:
@@ -425,6 +731,8 @@ private:
     std::string m_encoding;
 };
 
+#endif
+
 ///
 /// \brief The AudioOutputDescription class describes an audio output module
 ///
@@ -449,9 +757,9 @@ public:
 
     explicit AudioOutputDescription( libvlc_audio_output_t* c )
     {
-        if ( c->psz_name != NULL )
+        if ( c->psz_name != nullptr )
             m_name = c->psz_name;
-        if ( c->psz_description != NULL )
+        if ( c->psz_description != nullptr )
             m_description = c->psz_description;
     }
 
@@ -481,10 +789,10 @@ class AudioOutputDeviceDescription
 
         explicit AudioOutputDeviceDescription( libvlc_audio_output_device_t* d )
         {
-            if ( d->psz_device != NULL )
+            if ( d->psz_device != nullptr )
                 m_device = d->psz_device;
-            if ( d->psz_description != NULL )
-                m_device = d->psz_description;
+            if ( d->psz_description != nullptr )
+                m_description = d->psz_description;
         }
 
     private:
@@ -562,7 +870,7 @@ public:
         return ( m_flags & libvlc_title_interactive ) != 0;
     }
 
-    explicit TitleDescription( libvlc_title_description_t* c )
+    explicit TitleDescription( const libvlc_title_description_t* c )
         : m_duration( c->i_duration ), m_flags( c->i_flags )
     {
         if ( c->psz_name != nullptr )
@@ -622,7 +930,7 @@ private:
 ///
 /// \brief C++ Type wrapper for libvlc_media_slave_t
 ///
-class MediaSlave : private libvlc_media_slave_t
+class MediaSlave
 {
 public:
     ///
@@ -634,26 +942,33 @@ public:
         Audio = libvlc_media_slave_type_audio
     };
 
-    MediaSlave(libvlc_media_slave_t *other) :
-        libvlc_media_slave_t(*other)
+    MediaSlave( libvlc_media_slave_t *m )
+      : m_type( static_cast<Type>( m->i_type ) )
+      , m_priority( m->i_priority )
+      , m_uri( m->psz_uri )
     {
     }
 
 public:
     Type type() const
     {
-        return (Type)i_type;
+        return m_type;
     }
 
     unsigned priority() const
     {
-        return i_priority;
+        return m_priority;
     }
 
-    std::string uri() const
+    const std::string& uri() const
     {
-        return psz_uri;
+        return m_uri;
     }
+
+private:
+    Type m_type;
+    unsigned int m_priority;
+    std::string m_uri;
 };
 
 
@@ -698,9 +1013,9 @@ class RendererDiscovererDescription
 public:
     explicit RendererDiscovererDescription( const libvlc_rd_description_t* d )
     {
-        if (d->psz_name != NULL)
+        if (d->psz_name != nullptr)
             m_name = d->psz_name;
-        if (d->psz_longname != NULL)
+        if (d->psz_longname != nullptr)
             m_longName = d->psz_longname;
     }
 
