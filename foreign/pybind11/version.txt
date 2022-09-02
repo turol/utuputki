@@ -1,5 +1,10 @@
-commit 787d2c88cafa4d07fb38c9519c485a86323cfcf4
-Author: Henry Schreiner <henryschreineriii@gmail.com>
-Date:   Tue Aug 3 15:20:23 2021 -0400
+commit 97976c16fb7652f7faf02d76756666ef87adbe7d
+Author: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
+Date:   Mon Oct 4 16:38:31 2021 -0400
 
-    fix: include hex version in bump
+    [pre-commit.ci] pre-commit autoupdate (#3325)
+    
+    updates:
+    - [github.com/asottile/pyupgrade: v2.28.0 → v2.29.0](https://github.com/asottile/pyupgrade/compare/v2.28.0...v2.29.0)
+    
+    Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>

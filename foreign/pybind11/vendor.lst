@@ -4,10 +4,8 @@
 .cmake-format.yaml
 .github/CODEOWNERS
 .github/CONTRIBUTING.md
-.github/ISSUE_TEMPLATE/bug-report.md
+.github/ISSUE_TEMPLATE/bug-report.yml
 .github/ISSUE_TEMPLATE/config.yml
-.github/ISSUE_TEMPLATE/feature-request.md
-.github/ISSUE_TEMPLATE/question.md
 .github/dependabot.yml
 .github/labeler.yml
 .github/labeler_merged.yml
@@ -151,6 +149,8 @@ tests/test_copy_move.cpp
 tests/test_copy_move.py
 tests/test_custom_type_casters.cpp
 tests/test_custom_type_casters.py
+tests/test_custom_type_setup.cpp
+tests/test_custom_type_setup.py
 tests/test_docstring_options.cpp
 tests/test_docstring_options.py
 tests/test_eigen.cpp
@@ -208,6 +208,8 @@ tests/test_stl_binders.cpp
 tests/test_stl_binders.py
 tests/test_tagbased_polymorphic.cpp
 tests/test_tagbased_polymorphic.py
+tests/test_thread.cpp
+tests/test_thread.py
 tests/test_union.cpp
 tests/test_union.py
 tests/test_virtual_functions.cpp
