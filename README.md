@@ -18,7 +18,7 @@ VLC
 
 On Debian you can install them like this:
 ```
-apt install python3-dev python3-pyparsing libsqlite3-dev vlc
+apt install python3-dev python3-pyparsing libsqlite3-dev libvlc-dev
 ```
 
 There's a Debian package of youtube-dl. Don't use it, it's out of date and will fail to download most videos. Use pip3:
