@@ -1,5 +1,5 @@
-commit 8de7772cc72daca8e947b79b83fea46214931604
+commit 65e95ea8675ea34bdd566d6461330f25c651e5a8
 Author: Henry Schreiner <HenrySchreinerIII@gmail.com>
-Date:   Tue Jan 26 21:26:45 2021 -0500
+Date:   Fri Jul 16 09:27:47 2021 -0400
 
-    chore: prepare for the 2.6.2 release (#2821)
+    chore: bump to 2.7.0 (#3123)

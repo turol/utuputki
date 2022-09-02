@@ -2,6 +2,7 @@
 .clang-format
 .clang-tidy
 .cmake-format.yaml
+.github/CODEOWNERS
 .github/CONTRIBUTING.md
 .github/ISSUE_TEMPLATE/bug-report.md
 .github/ISSUE_TEMPLATE/config.yml
@@ -76,11 +77,13 @@ include/pybind11/detail/common.h
 include/pybind11/detail/descr.h
 include/pybind11/detail/init.h
 include/pybind11/detail/internals.h
+include/pybind11/detail/type_caster_base.h
 include/pybind11/detail/typeid.h
 include/pybind11/eigen.h
 include/pybind11/embed.h
 include/pybind11/eval.h
 include/pybind11/functional.h
+include/pybind11/gil.h
 include/pybind11/iostream.h
 include/pybind11/numpy.h
 include/pybind11/operators.h
@@ -88,7 +91,9 @@ include/pybind11/options.h
 include/pybind11/pybind11.h
 include/pybind11/pytypes.h
 include/pybind11/stl.h
+include/pybind11/stl/filesystem.h
 include/pybind11/stl_bind.h
+noxfile.py
 pybind11/__init__.py
 pybind11/__main__.py
 pybind11/_version.py
@@ -161,6 +166,7 @@ tests/test_eval.cpp
 tests/test_eval.py
 tests/test_eval_call.py
 tests/test_exceptions.cpp
+tests/test_exceptions.h
 tests/test_exceptions.py
 tests/test_factory_constructors.cpp
 tests/test_factory_constructors.py
