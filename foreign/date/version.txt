@@ -1,7 +1,5 @@
-commit cac99da8dc88be719a728dc1b597b0ac307c1800
-Author: Howard Hinnant <howard.hinnant@gmail.com>
-Date:   Tue Jun 2 21:08:57 2020 -0400
+commit 6e921e1b1d21e84a5c82416ba7ecd98e33a436d0
+Author: Anthony Louis <anthony@simbioseventures.com>
+Date:   Fri Apr 16 22:08:32 2021 -0300
 
-    For traits in constexpr context use ::value
-    
-    * Fixes #542
+    Add tests for %I and %p format options
