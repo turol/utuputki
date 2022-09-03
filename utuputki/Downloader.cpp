@@ -247,7 +247,7 @@ Downloader::DownloaderImpl::DownloaderImpl(Utuputki &utuputki_, const Config &co
 			LOG_INFO("Loaded yt-dlp");
 		} catch (py::error_already_set &e) {
 			LOG_INFO("Exception loading yt-dlp: {}", e.what());
-		youtubeDLModule = py::module_::import("youtube_dl");
+			youtubeDLModule = py::module_::import("youtube_dl");
 		}
 	});
 
