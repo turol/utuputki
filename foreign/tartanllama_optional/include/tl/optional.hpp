@@ -1,7 +1,9 @@
 
 ///
 // optional - An implementation of std::optional with extensions
-// Written in 2017 by Simon Brand (tartanllama@gmail.com, @TartanLlama)
+// Written in 2017 by Simon Brand (simonrbrand@gmail.com, @TartanLlama)
+//
+// Documentation available at https://tl.tartanllama.xyz/
 //
 // To the extent possible under law, the author(s) have dedicated all
 // copyright and related and neighboring rights to this software to the
@@ -15,8 +17,9 @@
 #ifndef TL_OPTIONAL_HPP
 #define TL_OPTIONAL_HPP
 
-#define TL_OPTIONAL_VERSION_MAJOR 0
-#define TL_OPTIONAL_VERSION_MINOR 5
+#define TL_OPTIONAL_VERSION_MAJOR 1
+#define TL_OPTIONAL_VERSION_MINOR 0
+#define TL_OPTIONAL_VERSION_PATCH 0
 
 #include <exception>
 #include <functional>
@@ -137,13 +140,13 @@ struct conjunction<B, Bs...>
     : std::conditional<bool(B::value), conjunction<Bs...>, B>::type {};
 
 #if defined(_LIBCPP_VERSION) && __cplusplus == 201103L
-#define TL_OPTIONAL_LIBCXX_MEM_FN_WORKAROUND
+#define TL_TRAITS_LIBCXX_MEM_FN_WORKAROUND
 #endif
 
 // In C++11 mode, there's an issue in libc++'s std::mem_fn
 // which results in a hard-error when using it in a noexcept expression
 // in some cases. This is a check to workaround the common failing case.
-#ifdef TL_OPTIONAL_LIBCXX_MEM_FN_WORKAROUND
+#ifdef TL_TRAITS_LIBCXX_MEM_FN_WORKAROUND
 template <class T> struct is_pointer_to_non_const_member_func : std::false_type{};
 template <class T, class Ret, class... Args>
 struct is_pointer_to_non_const_member_func<Ret (T::*) (Args...)> : std::true_type{};
@@ -166,7 +169,7 @@ template <class T> struct is_const_or_const_ref<T const> : std::true_type{};
 // std::invoke from C++17
 // https://stackoverflow.com/questions/38288042/c11-14-invoke-workaround
 template <typename Fn, typename... Args,
-#ifdef TL_OPTIONAL_LIBCXX_MEM_FN_WORKAROUND
+#ifdef TL_TRAITS_LIBCXX_MEM_FN_WORKAROUND
           typename = enable_if_t<!(is_pointer_to_non_const_member_func<Fn>::value 
                                  && is_const_or_const_ref<Args...>::value)>, 
 #endif
@@ -1238,9 +1241,9 @@ public:
   void
   swap(optional &rhs) noexcept(std::is_nothrow_move_constructible<T>::value
                                    &&detail::is_nothrow_swappable<T>::value) {
+    using std::swap;
     if (has_value()) {
       if (rhs.has_value()) {
-        using std::swap;
         swap(**this, *rhs);
       } else {
         new (std::addressof(rhs.m_value)) T(std::move(this->m_value));
@@ -1250,6 +1253,7 @@ public:
       new (std::addressof(this->m_value)) T(std::move(rhs.m_value));
       rhs.m_value.T::~T();
     }
+    swap(this->m_has_value, rhs.m_has_value);
   }
 
   /// Returns a pointer to the stored value
