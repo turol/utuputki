@@ -41,7 +41,7 @@ include(AddCXXCompilerFlag)
 include(DetermineTargetArchitecture)
 include(CMakeDependentOption)
 
-set(CIVETWEB_VERSION "1.13.0" CACHE STRING "The version of the civetweb library")
+set(CIVETWEB_VERSION "1.14.0" CACHE STRING "The version of the civetweb library")
 string(REGEX MATCH "([0-9]+)\\.([0-9]+)\\.([0-9]+)" CIVETWEB_VERSION_MATCH "${CIVETWEB_VERSION}")
 if ("${CIVETWEB_VERSION_MATCH}" STREQUAL "")
   message(FATAL_ERROR "Must specify a semantic version: major.minor.patch")
@@ -476,8 +476,11 @@ endif()
 
 
 # Set up the definitions
+option(CIVETWEB_ENABLE_DEBUG_TOOLS "For Debug builds enable verbose logging and assertions" ON)
 if (${CMAKE_BUILD_TYPE} MATCHES "[Dd]ebug")
-  add_definitions(-DDEBUG)
+  if(CIVETWEB_ENABLE_DEBUG_TOOLS)
+    add_definitions(-DDEBUG)
+  endif()
   add_definitions(-O0)
   add_definitions(-g)
 endif()
@@ -603,6 +606,9 @@ install(
   FILES
     "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake"
     "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake"
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindLibDl.cmake"
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindLibRt.cmake"
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindWinSock.cmake"
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
   COMPONENT civetweb-cmake-config
 )

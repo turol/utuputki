@@ -1,3 +1,14 @@
+/********************************************************/
+/*                                                      */
+/*   FUZZ TEST for civetweb.c                           */
+/*                                                      */
+/*   Copyright (c) 2015-2020 the CivetWeb developers    */
+/*                                                      */
+/*   This file contains test code for fuzz tests.       */
+/*   It should not be used in production code.          */
+/*                                                      */
+/********************************************************/
+
 #include "civetweb.h"
 #include <errno.h>
 #include <stdint.h>
@@ -19,177 +30,93 @@
 typedef int SOCKET;
 #define closesocket(a) (close(a))
 
-#endif
+#endif // not _WIN32
+
+
+/* Port configuration */
+unsigned short PORT_NUM_HTTP = 0; /* set dynamically */
+
+
+#define TESTabort()                                                            \
+	{                                                                          \
+		fprintf(stderr, "!!! Precondition in test environment not met !!!\n"); \
+		fprintf(stderr, "!!! aborting fuzz test in line %u !!!", __LINE__);    \
+		abort();                                                               \
+	}
 
 
 static uint64_t call_count = 0;
 
-static struct mg_context *ctx;
+
+/********************************************************/
+/* Init CivetWeb server ... test with mock client       */
+/********************************************************/
+#if defined(TEST_FUZZ1) || defined(TEST_FUZZ2)
+
+static struct mg_context *ctx = 0;
 static const char *OPTIONS[] = {"listening_ports",
-                                "8080,8443s",
+                                "0", /* port: auto */
                                 "document_root",
                                 "fuzztest/docroot",
-                                "ssl_certificate",
-                                "resources/cert/server.pem",
                                 NULL,
                                 NULL};
 
+static void
+civetweb_exit(void)
+{
+	printf("CivetWeb server exit\n");
+	mg_stop(ctx);
+	ctx = 0;
+	test_sleep(5);
+}
+
 
 static void
-init_civetweb(void)
+civetweb_init(void)
 {
 	struct mg_callbacks callbacks;
+	struct mg_server_port ports[8];
 	memset(&callbacks, 0, sizeof(callbacks));
+	memset(&ports, 0, sizeof(ports));
 
 	ctx = mg_start(&callbacks, 0, OPTIONS);
 
 	if (!ctx) {
 		fprintf(stderr, "\nCivetWeb test server failed to start\n");
-		abort();
+		TESTabort();
 	}
+
+	int ret = mg_get_server_ports(ctx, 8, ports);
+	if (ret != 1) {
+		fprintf(stderr,
+		        "\nCivetWeb test server: cannot determine port number\n");
+		TESTabort();
+	}
+	if (ports[0].is_ssl != 0) {
+		fprintf(stderr,
+		        "\nCivetWeb fuzz test works on HTTP, not HTTPS.\n"
+		        "TLS library should be fuzzed separately.\n");
+		TESTabort();
+	}
+	PORT_NUM_HTTP = ports[0].port;
+
+	printf("CivetWeb server running on port %i\n", (int)PORT_NUM_HTTP);
 
 	/* Give server 5 seconds to start, before flooding with requests.
 	 * Don't know if this is required for fuzz-tests, but it was helpful
 	 * when testing starting/stopping the server multiple times in test
 	 * container environments. */
 	test_sleep(5);
+	atexit(civetweb_exit);
 }
 
 
-struct tcp_func_prm {
-	SOCKET sock;
-};
-
-
-struct tRESPONSE {
-	char data[4096];
-	size_t size;
-} RESPONSE;
-
-
-static void *
-tcp_func(void *arg)
-{
-	char req[1024 * 16];
-	struct tcp_func_prm *ptcp_func_prm = (struct tcp_func_prm *)arg;
-	SOCKET svr = ptcp_func_prm->sock;
-	printf("Server ready, sock %i\n", svr);
-
-next_request : {
-	struct sockaddr_in cliadr;
-	socklen_t adrlen = sizeof(cliadr);
-	int buf_filled = 0;
-	int req_ready = 0;
-
-	memset(&cliadr, 0, sizeof(cliadr));
-
-	SOCKET cli = accept(svr, (struct sockaddr *)&cliadr, &adrlen);
-
-	if (cli == -1) {
-		int er = errno;
-		fprintf(stderr, "Error: Accept failed [%s]\n", strerror(er));
-		test_sleep(1);
-		goto next_request;
-	}
-
-	/* Read request */
-	do {
-		int r = recv(cli, req + buf_filled, sizeof(req) - buf_filled - 1, 0);
-		if (r > 0) {
-			buf_filled += r;
-			req[buf_filled] = 0;
-			if (strstr(req, "\r\n\r\n") != NULL) {
-				req_ready = 1;
-			}
-		} else {
-			/* some error */
-			int er = errno;
-			fprintf(stderr, "Error: Recv failed [%s]\n", strerror(er));
-			test_sleep(1);
-			goto next_request;
-		}
-	} while (!req_ready);
-
-	/* Request is complete here.
-	 * Now send response */
-	send(cli, RESPONSE.data, RESPONSE.size, MSG_NOSIGNAL);
-
-	/* Close connection. */
-	shutdown(cli, SHUT_RDWR);
-	closesocket(cli);
-
-	/* done */
-	goto next_request;
-}
-
-	free(arg);
-}
-
-
-static void
-init_tcp(void)
-{
-	int r;
-	SOCKET sock = socket(AF_INET, SOCK_STREAM, 6);
-	if (sock == -1) {
-		r = errno;
-		fprintf(stderr, "Error: Cannot create socket [%s]\n", strerror(r));
-		abort();
-	}
-	struct sockaddr_in sin;
-	memset(&sin, 0, sizeof(sin));
-	sin.sin_family = AF_INET;
-	sin.sin_addr.s_addr = inet_addr("127.0.0.1");
-	sin.sin_port = htons(8080);
-	r = bind(sock, (struct sockaddr *)&sin, sizeof(sin));
-	if (r != 0) {
-		r = errno;
-		fprintf(stderr, "Error: Cannot bind [%s]\n", strerror(r));
-		closesocket(sock);
-		abort();
-	}
-
-	r = listen(sock, 128);
-	if (r != 0) {
-		r = errno;
-		fprintf(stderr, "Error: Cannot listen [%s]\n", strerror(r));
-		closesocket(sock);
-		abort();
-	}
-
-	pthread_t thread_id;
-	pthread_attr_t attr;
-	int result;
-	struct tcp_func_prm *thread_prm;
-
-	thread_prm = (struct tcp_func_prm *)malloc(sizeof(struct tcp_func_prm));
-	if (!thread_prm) {
-		fprintf(stderr, "Error: Out of memory\n");
-		closesocket(sock);
-		abort();
-	}
-	thread_prm->sock = sock;
-
-	(void)pthread_attr_init(&attr);
-	(void)pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-	result = pthread_create(&thread_id, &attr, tcp_func, (void *)thread_prm);
-	(void)pthread_attr_destroy(&attr);
-	if (result != 0) {
-		r = errno;
-		fprintf(stderr, "Error: Cannot create thread [%s]\n", strerror(r));
-		closesocket(sock);
-		abort();
-	}
-
-	test_sleep(5);
-}
-
-
+#if defined(TEST_FUZZ1)
 static int
-test_http_request(const char *server,
-                  uint16_t port,
-                  int use_ssl,
-                  const char *uri)
+test_civetweb_client(const char *server,
+                     uint16_t port,
+                     int use_ssl,
+                     const char *uri)
 {
 	/* Client var */
 	struct mg_connection *client;
@@ -283,7 +210,7 @@ LLVMFuzzerTestOneInput_URI(const uint8_t *data, size_t size)
 
 	if (call_count == 0) {
 		memset(URI, 0, sizeof(URI));
-		init_civetweb();
+		civetweb_init();
 	}
 	call_count++;
 
@@ -294,15 +221,17 @@ LLVMFuzzerTestOneInput_URI(const uint8_t *data, size_t size)
 		return 1;
 	}
 
-	return test_http_request("127.0.0.1", 8080, 0, URI);
+	return test_civetweb_client("127.0.0.1", PORT_NUM_HTTP, 0, URI);
 }
+#endif
 
 
+#if defined(TEST_FUZZ2)
 static int
 LLVMFuzzerTestOneInput_REQUEST(const uint8_t *data, size_t size)
 {
 	if (call_count == 0) {
-		init_civetweb();
+		civetweb_init();
 	}
 	call_count++;
 
@@ -317,7 +246,7 @@ LLVMFuzzerTestOneInput_REQUEST(const uint8_t *data, size_t size)
 	memset(&sin, 0, sizeof(sin));
 	sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = inet_addr("127.0.0.1");
-	sin.sin_port = htons(8080);
+	sin.sin_port = htons(PORT_NUM_HTTP);
 	r = connect(sock, (struct sockaddr *)&sin, sizeof(sin));
 	if (r != 0) {
 		r = errno;
@@ -328,7 +257,7 @@ LLVMFuzzerTestOneInput_REQUEST(const uint8_t *data, size_t size)
 
 	char trash[1024];
 	r = send(sock, data, size, 0);
-	if (r != size) {
+	if (r != (int)size) {
 		fprintf(stderr, "Warning: %i bytes sent (TODO: Repeat)\n", r);
 	}
 
@@ -345,6 +274,176 @@ LLVMFuzzerTestOneInput_REQUEST(const uint8_t *data, size_t size)
 		max_data_read = data_read;
 		printf("GOT data: %i\n", data_read);
 	}
+	return 0;
+}
+#endif
+
+#endif // defined(TEST_FUZZ1) || defined(TEST_FUZZ2)
+
+
+/********************************************************/
+/* Init mock server ... test with CivetWeb client       */
+/********************************************************/
+#if defined(TEST_FUZZ3)
+
+struct tcp_func_prm {
+	SOCKET sock;
+};
+
+struct tRESPONSE {
+	char data[4096];
+	size_t size;
+} RESPONSE;
+
+
+volatile int mock_server_stop_flag = 0;
+
+static void
+mock_server_exit(void)
+{
+	printf("MOCK server exit\n");
+	mock_server_stop_flag = 1;
+	test_sleep(5);
+}
+
+
+static void *
+mock_server_thread(void *arg)
+{
+	char req[1024 * 16];
+	SOCKET svr = (SOCKET)(-1);
+
+	/* Get thread parameters and free arg */
+	{
+		struct tcp_func_prm *ptcp_func_prm = (struct tcp_func_prm *)arg;
+		svr = ptcp_func_prm->sock;
+		free(arg);
+	}
+
+	mock_server_stop_flag = 0;
+	printf("MOCK server ready, sock %i\n", svr);
+
+next_request:
+	while (!mock_server_stop_flag) {
+		struct sockaddr_in cliadr;
+		socklen_t adrlen = sizeof(cliadr);
+		int buf_filled = 0;
+		int req_ready = 0;
+
+		memset(&cliadr, 0, sizeof(cliadr));
+
+		SOCKET cli = accept(svr, (struct sockaddr *)&cliadr, &adrlen);
+
+		if (cli == -1) {
+			int er = errno;
+			fprintf(stderr, "Error: Accept failed [%s]\n", strerror(er));
+			test_sleep(1);
+			goto next_request;
+		}
+
+		/* Read request */
+		do {
+			int r =
+			    recv(cli, req + buf_filled, sizeof(req) - buf_filled - 1, 0);
+			if (r > 0) {
+				buf_filled += r;
+				req[buf_filled] = 0;
+				if (strstr(req, "\r\n\r\n") != NULL) {
+					req_ready = 1;
+				}
+			} else {
+				/* some error */
+				int er = errno;
+				fprintf(stderr, "Error: Recv failed [%s]\n", strerror(er));
+				test_sleep(1);
+				goto next_request;
+			}
+		} while (!req_ready);
+
+		/* Request is complete here.
+		 * Now send response */
+		send(cli, RESPONSE.data, RESPONSE.size, MSG_NOSIGNAL);
+
+		/* Close connection. */
+		shutdown(cli, SHUT_RDWR);
+		closesocket(cli);
+	}
+	return 0;
+}
+
+
+static void
+mock_server_init(void)
+{
+	int r;
+	int bind_success = 0;
+	SOCKET sock = socket(AF_INET, SOCK_STREAM, 6);
+	if (sock == -1) {
+		r = errno;
+		fprintf(stderr, "Error: Cannot create socket [%s]\n", strerror(r));
+		TESTabort();
+	}
+
+	for (PORT_NUM_HTTP = 1024; PORT_NUM_HTTP != 0; PORT_NUM_HTTP++) {
+		struct sockaddr_in sin;
+		memset(&sin, 0, sizeof(sin));
+		sin.sin_family = AF_INET;
+		sin.sin_addr.s_addr = inet_addr("127.0.0.1");
+		sin.sin_port = htons(PORT_NUM_HTTP);
+		r = bind(sock, (struct sockaddr *)&sin, sizeof(sin));
+		if (r == 0) {
+			bind_success = 1;
+			break;
+		}
+		r = errno;
+		fprintf(stderr, "Warning: Cannot bind [%s]\n", strerror(r));
+	}
+
+	if (!bind_success) {
+		fprintf(stderr, "Error: Cannot bind to any port\n");
+		closesocket(sock);
+		TESTabort();
+	}
+
+	printf("MOCK server running on port %i\n", (int)PORT_NUM_HTTP);
+
+	r = listen(sock, 128);
+	if (r != 0) {
+		r = errno;
+		fprintf(stderr, "Error: Cannot listen [%s]\n", strerror(r));
+		closesocket(sock);
+		TESTabort();
+	}
+
+	pthread_t thread_id;
+	pthread_attr_t attr;
+	int result;
+	struct tcp_func_prm *thread_prm;
+
+	thread_prm = (struct tcp_func_prm *)malloc(sizeof(struct tcp_func_prm));
+	if (!thread_prm) {
+		fprintf(stderr, "Error: Out of memory\n");
+		closesocket(sock);
+		TESTabort();
+	}
+	thread_prm->sock = sock;
+
+	(void)pthread_attr_init(&attr);
+	(void)pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	result = pthread_create(&thread_id,
+	                        &attr,
+	                        mock_server_thread,
+	                        (void *)thread_prm);
+	(void)pthread_attr_destroy(&attr);
+	if (result != 0) {
+		r = errno;
+		fprintf(stderr, "Error: Cannot create thread [%s]\n", strerror(r));
+		closesocket(sock);
+		TESTabort();
+	}
+
+	test_sleep(3);
+	atexit(mock_server_exit);
 }
 
 
@@ -352,7 +451,7 @@ static int
 LLVMFuzzerTestOneInput_RESPONSE(const uint8_t *data, size_t size)
 {
 	if (call_count == 0) {
-		init_tcp();
+		mock_server_init();
 	}
 	call_count++;
 
@@ -365,8 +464,8 @@ LLVMFuzzerTestOneInput_RESPONSE(const uint8_t *data, size_t size)
 
 	char errbuf[256];
 
-	struct mg_connection *conn =
-	    mg_connect_client("127.0.0.1", 8080, 0, errbuf, sizeof(errbuf));
+	struct mg_connection *conn = mg_connect_client(
+	    "127.0.0.1", PORT_NUM_HTTP, 0, errbuf, sizeof(errbuf));
 	if (!conn) {
 		printf("Connect error: %s\n", errbuf);
 		test_sleep(1);
@@ -377,13 +476,22 @@ LLVMFuzzerTestOneInput_RESPONSE(const uint8_t *data, size_t size)
 	int r = mg_get_response(conn, errbuf, sizeof(errbuf), 1000);
 	const struct mg_response_info *ri = mg_get_response_info(conn);
 
+	(void)r;
+	(void)ri;
+
 	mg_close_connection(conn);
 
 	return 0;
 }
 
+#endif // defined(TEST_FUZZ3)
 
-/* MAIN for fuzztest */
+/********************************************************/
+/* MAIN for fuzztest                                    */
+/********************************************************/
+int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size);
+// warning: no previous prototype for function 'LLVMFuzzerTestOneInput'
+
 int
 LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 {

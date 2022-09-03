@@ -242,13 +242,18 @@ Note that PHP scripts must use `php-cgi.exe` as executable, not `php.exe`.
 ### cgi\_interpreter\_args
 Optional additional arguments passed to a Windows CGI interpreter program.
 
-(Currently experimental - https://github.com/civetweb/civetweb/issues/854)
-
 ### cgi\_pattern `**.cgi$|**.pl$|**.php$`
 All files that match `cgi_pattern` are treated as CGI files. The default pattern
 allows CGI files be anywhere. To restrict CGIs to a certain directory,
 use `/path/to/cgi-bin/**.cgi` as the pattern. Note that the full file path is
 matched against the pattern, not the URI.
+
+Depending on the build configuration, additional patterns `cgi2_pattern`,
+`cgi3_pattern` and `cgi4_pattern` may be available.
+This allows to use different cgi interpreter programs (`cgi2_interpreter`,
+...), environments (`cgi2_environment` ...) and interpreter arguments
+(`cgi2_interpreter_argument`, ...). The default for all additional CGI file
+patterns is empty - they are not used unless they are configured explicitly.
 
 ### cgi\_timeout\_ms
 Maximum allowed runtime for CGI scripts.  CGI processes are terminated by
@@ -273,6 +278,11 @@ will be accepted.
 
 ### enable\_directory\_listing `yes`
 Enable directory listing, either `yes` or `no`.
+
+### enable\_http2 `no`
+Enable HTTP2 protocol.  Note: This option is only available, if the server has been
+compiled with the `USE_HTTP2` define.  The CivetWeb server supports only a subset of
+all HTTP2 features.
 
 ### enable\_keep\_alive `no`
 Enable connection keep alive, either `yes` or `no`.
@@ -436,26 +446,41 @@ environment - in some cases, you might need to resort to a fixed IP address.
 If you want to use an ephemeral port (i.e. let the operating system choose
 a port number), use `0` for the port number. This will make it necessary to
 communicate the port number to clients via other means, for example mDNS
-(or Zeroconf, Bonjour or Avahi).
+(Zeroconf, Bonjour, Avahi).
+
+In case the server has been built with the `USE_X_DOM_SOCKET` option set,
+it can listen to unix domain sockets as well. They are specified by a
+lower case `x` followed by the domain socket path, e.g. `x/tmp/sockname`.
+Domain sockets do not require a port number, always use HTTP (not HTTPS)
+and never redirect. Thus `:` is not allowed, while `r` or `s` at the end
+of the configuration is interpreted as part of the domain socket path.
+The domain sochet path must be a valid path to a non-existing file on a
+Unix/Linux system. The CivetWeb process needs write/create access rights
+to create the domain socket in the Unix/Linux file system.
+Use only alphanumerical characters, underscore and `/` in a domain socket
+path (in particular, `,;:` must be avoided).
+
+All socket/protocol types may be combined, separated by `,`.
+E.g.: `127.0.0.1:80,[::1]:80,x/tmp/sockname` will listen to localhost
+http connections using IPv4, IPv6 and the domain socket `/tmp/sockname`.
 
 ### lua\_background\_script
-Experimental feature, and subject to change.
 Run a Lua script in the background, independent from any connection.
 The script is started before network access to the server is available.
 It can be used to prepare the document root (e.g., update files, compress
 files, ...), check for external resources, remove old log files, etc.
 
+The script can define callbacks to be notified when the server starts
+or stops. Furthermore, it can be used for log filtering or formatting. 
 The Lua state remains open until the server is stopped.
-In the future, some callback functions will be available to notify the
-script on changes of the server state. See example lua script :
-[background.lua](https://github.com/civetweb/civetweb/blob/master/test/background.lua).
 
-Additional functions available in background script :
-sleep, root path, script name, is terminated
+For a detailed descriotion of available Lua callbacks see section
+"Lua background script" below.
 
-### lua\_background\_script\_params `param1=1,param2=2`
+### lua\_background\_script\_params
 Can add dynamic parameters to background script.
-Parameters mapped to global 'mg' table 'params' field.
+Parameters mapped into 'mg.params' as table.
+Example: `paramName1=paramValue1,paramName2=2`
 
 ### lua\_preload\_file
 This configuration option can be used to specify a Lua script file, which
@@ -586,7 +611,7 @@ certificate with the same subject name they should have extensions ".0", ".1",
 ### ssl\_cache\_timeout `-1`
 Allow caching of SSL/TLS sessions, so HTTPS connection from the same client
 to the same server can be established faster. A configuration value >0 activates
-session caching. The configuration value is the maximum lifetime of a cached 
+session caching. The configuration value is the maximum lifetime of a cached
 session in seconds.
 The default is to deactivated session caching.
 
@@ -614,19 +639,20 @@ OpenSSL documentation for full list of options and additional examples.
 ### ssl\_default\_verify\_paths `yes`
 Loads default trusted certificates locations set at openssl compile time.
 
-### ssl\_protocol\_version `0`
+### ssl\_protocol\_version `4`
 Sets the minimal accepted version of SSL/TLS protocol according to the table:
 
 Protocols | Value
 ------------ | -------------
-SSL2+SSL3+TLS1.0+TLS1.1+TLS1.2  | 0
-SSL3+TLS1.0+TLS1.1+TLS1.2  | 1
-TLS1.0+TLS1.1+TLS1.2 | 2
-TLS1.1+TLS1.2 | 3
-TLS1.2 | 4
+SSL2+SSL3+TLS1.0+TLS1.1+TLS1.2+TLS1.3 | 0
+SSL3+TLS1.0+TLS1.1+TLS1.2+TLS1.3  | 1
+TLS1.0+TLS1.1+TLS1.2+TLS1.3 | 2
+TLS1.1+TLS1.2+TLS1.3 | 3
+TLS1.2+TLS1.3 | 4
+TLS1.3 | 5
 
-More recent versions of OpenSSL include support for TLS version 1.3.
-To use TLS1.3 only, set ssl\_protocol\_version to 5.
+TLS version 1.3 is only available if you are using an up-to-date TLS libary.
+The default setting has been changed from 0 to 4 in CivetWeb 1.14.
 
 ### ssl\_short\_trust `no`
 Enables the use of short lived certificates. This will allow for the certificates
@@ -757,7 +783,7 @@ with websocket support enabled.
 
 The following options are supported in `main.c`, the additional source file for
 the stand-alone executable. These options are not supported by other applications
-embedding `civetweb.c`, unless they are added explicitly.
+embedding `civetweb.c`, unless they are added to the embedding application.
 
 ### title
 Use the configured string as a server name.  For Windows, this will be shown as
@@ -771,15 +797,44 @@ icon.  This option has no effect for Linux.
 For Windows, use this website as a link in the systray, replacing the default
 link for CivetWeb.
 
+### hide\_tray `no`
+For Windows: Do not show a tray icon. May be `yes` (hide) or `no` (show, default).
+
+### daemonize `no`
+This option is only available for Linux, if the server has been build with the
+`DAEMONIZE` compile options.  Call (deprecated) `daemon()` BSD function to
+detach the server process from the controlling terminal and run it in the
+background as a system daemon.
+
 ### add\_domain
 Option to load an additional configuration file, specifying an additional domain
 to host.  To add multiple additional domains, use the add\_domain option
 multiple times with one configuration file for each domain.
-A domain configuration file may have the same options as the main server, with
-some exceptions.  The options are passed to the `mg_start_domain` API function.
+This option is available for Windows and Linux operating systems.
 
-### hide\_tray `no`
-Do not show a tray icon. May be `yes` (hide) or `no` (show, default).
+Internally, the options are passed to the `mg_start_domain` API function.
+If you are not using `main.c`, you need to call this API function to activate
+and additional domain.
+
+Every domain configuration file may contain a subset of the options available for
+the main server configuration files, with some exceptions.   Some configurations
+are per server while others are available for each domain.
+
+All port, socket, process and thread specific parameters are per server:
+`allow_sendfile_call`, `case_sensitive`, `connection_queue`, `decode_url`,
+`enable_http2`, `enable_keep_alive`, `enable_websocket_ping_pong`,
+`keep_alive_timeout_ms`, `linger_timeout_ms`, `listen_backlog`,
+`listening_ports`, `lua_background_script`, `lua_background_script_params`,
+`max_request_size`, `num_threads`, `request_timeout_ms`, `run_as_user`,
+`tcp_nodelay`, `throttle`, `websocket_timeout_ms` + all options from `main.c`.
+
+All other options can be set per domain. In particular
+`authentication_domain`, `document_root` and (for HTTPS) `ssl_certificate`
+must be set for each additional domain.
+
+While some options like `error_log_file` are per domain, the setting of the
+initial (main) domain may be used if the server could not determine the
+correct domain for a specific request.
 
 
 Scripting
@@ -869,37 +924,73 @@ mg (table):
 
     mg.read()                   -- reads a chunk from POST data, returns it as a string
     mg.write(str)               -- writes string to the client
+    mg.cry(str)                 -- logs error string to stderr
     mg.include(filename, [pathtype]) -- include another Lua Page file (Lua Pages only)
                                 -- pathtype can be "abs", "rel"/"file" or "virt[ual]"
                                 -- like defined for SSI #include
-    mg.redirect(uri)            -- internal redirect to a given URI
+    mg.redirect(uri)            -- redirect to internal URI
     mg.onerror(msg)             -- error handler, can be overridden
-    mg.version                  -- a string that holds CivetWeb version
-    mg.document_root            -- a string that holds the document root directory
     mg.auth_domain              -- a string that holds the HTTP authentication domain
-    mg.get_var(str, varname)    -- extract variable from (query) string
+    mg.document_root            -- a string that holds the document root directory
+    mg.lua_type                 -- a string that holds the lua script type
+    mg.system                   -- a string that holds the operating system name
+    mg.version                  -- a string that holds CivetWeb version
     mg.get_cookie(str, cookie)  -- extract cookie from a string
-    mg.get_mime_type(filename)  -- get MIME type of a file
     mg.get_info(infotype)       -- get server status information
+    mg.get_mime_type(filename)  -- get MIME type of a file
+    mg.get_option(name)         -- get configuration option value from name
+    mg.get_response_code_text(n)-- get response code text for n, nil otherwise
+    mg.get_var(str, varname, [occurance])  -- extract the first occurance of variable from (query) string
+                                --     otherwise the nth occurance if supplied, nil if not found
     mg.send_file(filename)      -- send a file, including all required HTTP headers
     mg.send_file_body(filename) -- send a file, excluding HTTP headers
+    mg.send_http_error(n,str)   -- send http error code n with string body
+    mg.send_http_ok(mime,body)  -- send http 200 OK with content-type mime and string body
+    mg.send_http_ok(mime,length)-- send http 200 OK with content-type mime and integer content-length length
+    mg.send_http_redirect(url,n)-- redirect to url with status code n
+    mg.split_form_data(form)    -- returns a table of the split form data
     mg.url_encode(str)          -- URL encode a string
     mg.url_decode(str, [form])  -- URL decode a string. If form=true, replace + by space.
     mg.base64_encode(str)       -- BASE64 encode a string
     mg.base64_decode(str)       -- BASE64 decode a string
     mg.md5(str)                 -- return the MD5 hash of a string
     mg.keep_alive(bool)         -- allow/forbid to use http keep-alive for this request
+    mg.time([bool])             -- get the current unix timestamp with milliseconds
+                                --     if bool is true then it is the time since startup
+    mg.trace(n,message,...)     -- trace level n messages into tracefile
+    mg.uuid()                   -- generate a uuid
+    mg.random()                 -- get a random floating point number
     mg.request_info             -- a table with the following request information
+         .content_length        -- Request content-length as a float
+         .content_type          -- Request content-type, nil otherwise
+         .request_link          -- Requested link
+         .request_uri           -- Request URI
+         .uri                   -- Local request URI
+         .path_info             -- Request URI, nil otherwise
+         .status                -- Request status code, nil otherwise
          .remote_addr           -- IP address of the client as string
          .remote_port           -- remote port number
          .server_port           -- server port number
          .request_method        -- HTTP method (e.g.: GET, POST)
          .http_version          -- HTTP protocol version (e.g.: 1.1)
-         .uri                   -- resource name
+         .http_headers          -- Table of HTTP headers
+         .num_headers           -- Number of headers
          .query_string          -- query string if present, nil otherwise
-         .script_name           -- name of the Lua script
+         .script_name           -- name of the Lua script, nil otherwise
          .https                 -- true if accessed by https://, false otherwise
          .remote_user           -- user name if authenticated, nil otherwise
+         .auth_type             -- Digest
+         .client_cert           -- Table with ssl certificate infomation
+              .subject          -- Certificate subject
+              .issuer           -- Certificate issuer
+              .serial           -- Certificate serial number
+              .finger           -- Certificate finger
+
+If websocket and timers support is enabled then the following is also available:
+
+    mg.set_timeout(fn,delay,[interval])  -- call function after delay at an interval
+    mg.set_interval(fn,delay,[interval]) -- call function after delay at an interval
+    mg.websocket_root                    -- a string that holds the websocket root
 
 connect (function):
 
@@ -953,7 +1044,7 @@ or using Lua code:
 
 or Lua Server Pages generating HTML content MAY skip the HTTP header lines.
 In this case, CivetWeb automatically creates a "200 OK"/"Content-Type: text/html"
-reply header. In this case, the document should start with "<!DOCTYPE html>"
+reply header. In this case, the document must start with "<!DOCTYPE html>"
 or "<html".
 
 Currently the extended "Kepler Syntax" is available only for text/html pages
@@ -966,11 +1057,10 @@ header and generate any kind of file.
 CivetWeb offers support for websockets in Lua as well. In contrast to plain
 Lua scripts and Lua server pages, Lua websocket scripts are shared by all clients.
 
-Lua websocket scripts must define a few functions:
-    open(arg)    -- callback to accept or reject a connection
-    ready(arg)   -- called after a connection has been established
-    data(arg)    -- called when the server receives data from the client
-    close(arg)   -- called when a websocket connection is closed
+Lua websocket scripts must define the following functions:
+    `ready(arg)`   -- called after a connection has been established
+    `data(arg)`    -- called when the server receives data from the client
+    `close(arg)`   -- called when a websocket connection is closed
 All function are called with one argument of type table with at least one field
 "client" to identify the client. When "open" is called, the argument table additionally
 contains the "request_info" table as defined above. For the "data" handler, an
@@ -982,6 +1072,43 @@ Lua websocket pages do support single shot (timeout) and interval timers.
 An example is shown in
 [websocket.lua](https://github.com/civetweb/civetweb/blob/master/test/websocket.lua).
 
+## Lua background script
+The Lua background script is loaded when the server is starting,
+before any client is able to connect. It can be used for preparation and
+maintenance tasks, e.g., for preparing the web contents, cleaning log files,
+etc.
+
+The Name of the script file including path is configured as `lua_background_script`.
+Additional parameters can be supplied using `lua_background_script_params`.
+
+The background script is loaded before the server is ready to start.
+It may return a boolean value. If "false" in returned, the server will
+not be started. Since the server is not fully initialized when the script is loaded,
+some features of the "mg" library are not available yet. Use the "start()" callbacks
+function instead.
+
+A Lua background script may define the following functions:
+    `start()`        -- called wnen the server is started
+    `stop()`         -- called when the server is stopped
+    `log(req, res)`  -- called when an access log entry is created
+
+The return values of `start` and `stop` are ignored. The `start` callback can be used
+to create timers.
+
+The optional function `log` may be used to filter or format access log file entries.
+The `request_info` table is supplied as first argument (content of this table: see above).
+The second argument is the request processing result. It contains the number of bytes
+`read` and `written` (incl. header information), the `processing_time` in seconds, 
+the `protocol` ("http", "https", "ws" or "wss"). For internally generated response and
+response generated using the `mg_response_*()` API, it will contain the http `status` 
+code and a the response `http_headers` table (CGI response will not have all headers).
+
+The function can return a boolean value: true if the entry should be logged or false if not.
+Alternatively it can return a string: this will be used as log message
+(empty strings will not be logged).
+
+See example Lua script :
+[background.lua](https://github.com/civetweb/civetweb/blob/master/test/lua_backbround_script_timer.lua).
 
 # Using CGI
 

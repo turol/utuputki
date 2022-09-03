@@ -55,10 +55,11 @@ CivetWeb must be used with an earlier or later version (see also [here](https://
 Trouble tickets should be filed on GitHub
 [https://github.com/civetweb/civetweb/issues](https://github.com/civetweb/civetweb/issues)
 
-Announcements are at Google Groups
-[https://groups.google.com/d/forum/civetweb](https://groups.google.com/d/forum/civetweb). 
-Some older support and discussion threads are there as well. 
-However, recently support questions and discussions are usually [GitHub issues](https://github.com/civetweb/civetweb/issues).
+New releases are announced at Google Groups
+[https://groups.google.com/d/forum/civetweb](https://groups.google.com/d/forum/civetweb)
+
+Formerly some support question and discussion threads have been at [Google groups](https://groups.google.com/d/forum/civetweb).
+Recent questions and discussions use [GitHub issues](https://github.com/civetweb/civetweb/issues).
 
 Source releases can be found on GitHub
 [https://github.com/civetweb/civetweb/releases](https://github.com/civetweb/civetweb/releases)
@@ -85,6 +86,7 @@ Quick start documentation
 - [docs/OpenSSL.md](https://github.com/civetweb/civetweb/blob/master/docs/OpenSSL.md) - Adding HTTPS (SSL/TLS) support using OpenSSL.
 - [API documentation](https://github.com/civetweb/civetweb/tree/master/docs/api) - Additional documentation on the civetweb application programming interface ([civetweb.h](https://github.com/civetweb/civetweb/blob/master/include/civetweb.h)).
 - [RELEASE_NOTES.md](https://github.com/civetweb/civetweb/blob/master/RELEASE_NOTES.md) - Release Notes
+- [SECURITY.md](https://github.com/civetweb/civetweb/blob/master/SECURITY.md) - Security Policy
 - [LICENSE.md](https://github.com/civetweb/civetweb/blob/master/LICENSE.md) - Copyright License
 
 
@@ -107,7 +109,7 @@ simplicity by a carefully selected list of features:
 - Scripting and database support (CGI, SQLite database, Lua Server Pages,
   Server side Lua scripts, Server side JavaScript).
   This provides a ready to go, powerful web development platform in a one
-  single-click executable with **no dependencies**.
+  single-click executable with **no dependencies**.0
 - Support for CGI, SSI, HTTP digest (MD5) authorization, WebSocket,
   WebDAV.
 - HTTPS (SSL/TLS) support using [OpenSSL](https://www.openssl.org/).
@@ -137,23 +139,39 @@ simplicity by a carefully selected list of features:
 [![Duktape](https://raw.githubusercontent.com/civetweb/civetweb/master/resources/duktape-logo.png "Duktape Logo")](http://duktape.org)
 
 
+### Optional depencencies
+
+[![zlib](https://raw.githubusercontent.com/civetweb/civetweb/master/resources/zlib3d-b1.png "zlib Logo")](https://zlib.net)
+
+[![OpenSSL](https://raw.githubusercontent.com/civetweb/civetweb/master/resources/OpenSSL_logo.png "OpenSSL Logo")](https://www.openssl.org/)
+
+[![Mbed TLS](https://raw.githubusercontent.com/civetweb/civetweb/master/resources/mbedTLS_logo.png "mbedTLS Logo")](https://github.com/ARMmbed/mbedtls)
+
+
+
 Support
 -------
 
-This project is very easy to install and use. 
+This project is very easy to install and use.
 Please read the [documentation](https://github.com/civetweb/civetweb/blob/master/docs/)
 and have a look at the [examples](https://github.com/civetweb/civetweb/blob/master/examples/).
 
-Some information may be found on the [mailing list](https://groups.google.com/d/forum/civetweb),
-However, since questions and discussions moved to [GitHub issues](https://github.com/civetweb/civetweb/issues), information there may be out of date.
+Recent questions and discussions usually use [GitHub issues](https://github.com/civetweb/civetweb/issues).
+Some old information may be found on the [mailing list](https://groups.google.com/d/forum/civetweb), 
+but this information may be outdated.
+
+Feel free to create a GitHub issue for bugs, feature requests, questions, suggestions or if you want to share tips and tricks.
+When creating an issues for a bug, add enough description to reproduce the issue - at least add CivetWeb version and operating system.
+Please see also the guidelines for [Contributions](https://github.com/civetweb/civetweb/blob/master/docs/Contribution.md) and the [Security Policy](https://github.com/civetweb/civetweb/blob/master/SECURITY.md)
 
 Note: We do not take any liability or warranty for any linked contents.  Visit these pages and try the community support suggestions at your own risk.
 Any link provided in this project (including source and documentation) is provided in the hope that this information will be helpful.
 However, we cannot accept any responsibility for any content on an external page.
 
 
+
 Contributions
----------------
+-------------
 
 Contributions are welcome provided all contributions carry the MIT license.
 
@@ -164,11 +182,12 @@ By now the code base differs, so patches cannot be safely transferred in either 
 Some guidelines can be found in [docs/Contribution.md](https://github.com/civetweb/civetweb/blob/master/docs/Contribution.md).
 
 
-### Authors
+Authors
+-------
 
 CivetWeb has been forked from the last MIT version of Mongoose in 2013.
 Since then, CivetWeb has seen many improvements from various authors
-(Copyright (c) 2013-2020 the CivetWeb developers, MIT license).
+(Copyright (c) 2013-2021 the CivetWeb developers, MIT license).
 
 A list of authors can be found in [CREDITS.md](https://github.com/civetweb/civetweb/blob/master/CREDITS.md).
 

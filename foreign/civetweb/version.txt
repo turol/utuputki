@@ -1,5 +1,5 @@
-commit 8e243456965c9be5212cb96519da69cd54550e3d
+commit c1d08d3c35bc939da7bec09973bda77c702c1d00
 Author: bel2125 <bel2125@gmail.com>
-Date:   Wed Sep 30 20:24:15 2020 +0200
+Date:   Tue Apr 6 07:56:18 2021 +0200
 
-    Fix coverity issues for release 1.13
+    Set OpenSSL API define for x86 release build

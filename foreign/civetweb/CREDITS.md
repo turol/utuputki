@@ -3,9 +3,11 @@
 * Abhishek Lekshmanan
 * Abramo Bagnara
 * Adam Bailey
+* Adam Hunyadi
 * Alan Somers
 * Alberto Bignotti
 * Alex Kozlov
+* Alexander Kozhinov
 * AndreyArsov
 * Anton Te
 * beaver
@@ -38,17 +40,20 @@
 * daveelton
 * David Arnold
 * David Loffredo
+* DavidKorczynski
 * Dialga
+* DL6ER
 * Domenico Di Iorio
+* dprandle
 * Drew Wells
 * duong2179
 * ehlertjd
 * Elan P. Kugelmass
-* eugene
 * Eric Tsau
 * Erick Vieyra
 * Erik Beran
 * Erik Partridge
+* eugene
 * extergnoto
 * F-Secure Corporation
 * Fabrice Fontaine
@@ -71,10 +76,12 @@
 * Iain Morton
 * ImgBotApp
 * Ivan Dlugos
+* IZI
 * Jack
 * Jacob Repp
 * Jacob Skillin
 * Jan Kowalewski
+* Jan Pohanka
 * Jan Willem Janssen
 * Jeremy Lin
 * Jesse Williamson
@@ -101,12 +108,14 @@
 * Kevin Wojniak
 * Khem Raj
 * Kimmo Mustonen
+* krpano
 * Krzysztof Kozlowski
 * Lammert Bies
 * Lars Immisch
 * Lawrence
 * Li Peng
 * Lianghui
+* Lorenzo Canepa
 * Luka Rahne
 * Lukas Martanovic
 * Maarten Fremouw
@@ -140,10 +149,12 @@
 * Peter Foerster
 * Philipp Friedenberger
 * Philipp Hasper
+* Pieter Cardoen
 * Piotr Zierhoffer
 * pkvamme
 * Ponnuvel Palaniyappan
 * qinch
+* qinchao
 * Radoslaw Zarzynski
 * Red54
 * Retallack Mark mark.retallack
@@ -175,6 +186,8 @@
 * Thomas Davis
 * Thomas Klausner
 * Thorsten Horstmann
+* Tim Gates
+* Tim Hudson
 * tnoho
 * Tom Deblauwe
 * Tomas Andrle
@@ -187,6 +200,7 @@
 * wangli28
 * webxer
 * William Greathouse
+* Wolfram Rösler
 * xeoshow
 * xtne6f
 * Yehuda Sadeh
