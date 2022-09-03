@@ -1,5 +1,5 @@
-commit c1d08d3c35bc939da7bec09973bda77c702c1d00
+commit eefb26f82b233268fc98577d265352720d477ba4
 Author: bel2125 <bel2125@gmail.com>
-Date:   Tue Apr 6 07:56:18 2021 +0200
+Date:   Wed Sep 1 10:46:33 2021 +0200
 
-    Set OpenSSL API define for x86 release build
+    Visual Studio project for Release V1.15

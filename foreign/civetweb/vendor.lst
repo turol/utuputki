@@ -64,6 +64,7 @@ cmake/check/c82fe8888aacfe784476112edd3878256d2e30bc.patch
 cmake/check/check_run.patch
 cmake/check/patch.cmake
 cmake/civetweb-config.cmake.in
+codecov.yml
 conan/build.py
 conan/test_package/CMakeLists.txt
 conan/test_package/conanfile.py
@@ -80,7 +81,6 @@ docs/Building.md
 docs/Contribution.md
 docs/Embedding.md
 docs/Installing.md
-docs/Interface_Changes_1.10.md
 docs/OpenSSL.md
 docs/README.md
 docs/UserManual.md
@@ -129,6 +129,7 @@ docs/api/mg_lock_connection.md
 docs/api/mg_lock_context.md
 docs/api/mg_md5.md
 docs/api/mg_modify_passwords_file.md
+docs/api/mg_modify_passwords_file_ha1.md
 docs/api/mg_option.md
 docs/api/mg_printf.md
 docs/api/mg_read.md
@@ -170,38 +171,6 @@ docs/api/mg_write.md
 docs/mbedtls.md
 docs/yaSSL.md
 examples/README.md
-examples/_obsolete/chat/Makefile
-examples/_obsolete/chat/chat.c
-examples/_obsolete/docroot/favicon.ico
-examples/_obsolete/docroot/index.html
-examples/_obsolete/docroot/jquery.js
-examples/_obsolete/docroot/login.html
-examples/_obsolete/docroot/logo.png
-examples/_obsolete/docroot/main.js
-examples/_obsolete/docroot/prime_numbers.lp
-examples/_obsolete/docroot/style.css
-examples/_obsolete/hello/Makefile
-examples/_obsolete/hello/hello.c
-examples/_obsolete/lua/lua_dll.c
-examples/_obsolete/post/Makefile
-examples/_obsolete/post/post.c
-examples/_obsolete/upload/Makefile
-examples/_obsolete/upload/upload.c
-examples/_obsolete/websocket/Makefile
-examples/_obsolete/websocket/WebSockCallbacks.c
-examples/_obsolete/websocket/WebSockCallbacks.h
-examples/_obsolete/websocket/websock.htm
-examples/_obsolete/websocket/websocket.c
-examples/_obsolete/websocket_client/Makefile
-examples/_obsolete/websocket_client/ssl/server.crt
-examples/_obsolete/websocket_client/ssl/server.csr
-examples/_obsolete/websocket_client/ssl/server.key
-examples/_obsolete/websocket_client/ssl/server.key.orig
-examples/_obsolete/websocket_client/ssl/server.pem
-examples/_obsolete/websocket_client/websocket_client.c
-examples/_obsolete/ws_server/Makefile
-examples/_obsolete/ws_server/docroot/index.html
-examples/_obsolete/ws_server/ws_server.c
 examples/embedded_c/Makefile
 examples/embedded_c/embedded_c.c
 examples/embedded_cpp/Makefile
@@ -1157,6 +1126,7 @@ test/cors.reply.shtml
 test/delayed.cgi
 test/dir with spaces/file with spaces.txt
 test/dir with spaces/hello.cgi
+test/dir with spaces/r&d.txt
 test/donate.html
 test/echo.lua
 test/error.lua
@@ -1341,7 +1311,9 @@ test/windows_fail_silent.cgi.cmd
 test/ws_status.lua
 test/x.php
 unittest/CMakeLists.txt
-unittest/build_and_run.sh
+unittest/build_and_test_default.sh
+unittest/build_and_test_full.sh
+unittest/build_and_test_minimal.sh
 unittest/cgi_test.c
 unittest/civetweb_check.h
 unittest/main.c

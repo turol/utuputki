@@ -1,8 +1,12 @@
 /*
- * Copyright (c) 2013-2020 the CivetWeb developers
+ * Copyright (c) 2013-2021 the CivetWeb developers
  * Copyright (c) 2013 No Face Press, LLC
  * License http://opensource.org/licenses/mit-license.php MIT License
  */
+
+/* Note: This example ommits some error checking and input validation for a
+ * better clarity/readability of the code. Example codes undergo less quality
+ * management than the main source files of this project. */
 
 #ifdef NO_SSL
 #define TEST_WITHOUT_SSL
@@ -286,17 +290,65 @@ field_found(const char *key,
             size_t pathlen,
             void *user_data)
 {
+#ifdef _WIN32
+	char temppath[MAX_PATH + 2];
+	DWORD temppathlen;
+#endif
+
 	struct mg_connection *conn = (struct mg_connection *)user_data;
 
 	mg_printf(conn, "\r\n\r\n%s:\r\n", key);
 
 	if (filename && *filename) {
+
+		/* According to
+		 * https://datatracker.ietf.org/doc/html/rfc7578#section-4.2: Do not use
+		 * path information present in the filename. Drop all "/" (and "\" for
+		 * Windows).
+		 */
+		const char *fname = filename;
+		const char *sep = strrchr(fname, '/');
+		if (sep) {
+			fname = sep + 1;
+		}
+
 #ifdef _WIN32
-		_snprintf(path, pathlen, "D:\\tmp\\%s", filename);
+		sep = strrchr(fname, '\\');
+		if (sep) {
+			fname = sep + 1;
+		}
+
+		/* For Windows: Find the directory for temporary files */
+		temppathlen = GetTempPathA(sizeof(temppath), temppath);
+		if (temppathlen > 0) {
+			_snprintf(path, pathlen, "%s\\%s", temppath, fname);
+		} else {
+			_snprintf(path, pathlen, "C:\\tmp\\%s", fname);
+		}
 #else
-		snprintf(path, pathlen, "/tmp/%s", filename);
+		snprintf(path, pathlen, "/tmp/%s", fname);
 #endif
-		return MG_FORM_FIELD_STORAGE_STORE;
+
+		/* According to https://datatracker.ietf.org/doc/html/rfc7578#section-7:
+		 * Do not overwrite existing files.
+		 */
+		{
+			FILE *ftest = fopen(path, "r");
+			if (!ftest) {
+				return MG_FORM_FIELD_STORAGE_STORE;
+			}
+			fclose(ftest);
+			/* This is just simple demo code. More sophisticated code could add
+			 * numbers to the file name to make filenames unique. However, most
+			 * likely file upload will not end up in the temporary path, but in
+			 * a user directory - multiple directories for multiple users that
+			 * are logged into the web service. In this case, users might want
+			 * to overwrite their own code. You need to adapt this example to
+			 * your needs.
+			 */
+		}
+
+		return MG_FORM_FIELD_STORAGE_SKIP;
 	}
 	return MG_FORM_FIELD_STORAGE_GET;
 }

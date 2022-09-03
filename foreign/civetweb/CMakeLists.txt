@@ -1,12 +1,7 @@
-# Determines what CMake APIs we can rely on
-cmake_minimum_required (VERSION 2.8.11)
-if (${CMAKE_VERSION} VERSION_GREATER 3.2.2)
-  cmake_policy(VERSION 3.2.2)
-endif()
-if (${CMAKE_VERSION} VERSION_GREATER 3.1 OR
-    ${CMAKE_VERSION} VERSION_EQUAL 3.1)
-  cmake_policy(SET CMP0054 NEW)
-endif()
+# Use at least CMake 3.3
+cmake_minimum_required (VERSION 3.3.0)
+cmake_policy(VERSION 3.2.2)
+cmake_policy(SET CMP0054 NEW)
 
 # Set up the project
 project (civetweb)
@@ -41,7 +36,7 @@ include(AddCXXCompilerFlag)
 include(DetermineTargetArchitecture)
 include(CMakeDependentOption)
 
-set(CIVETWEB_VERSION "1.14.0" CACHE STRING "The version of the civetweb library")
+set(CIVETWEB_VERSION "1.15.0" CACHE STRING "The version of the civetweb library")
 string(REGEX MATCH "([0-9]+)\\.([0-9]+)\\.([0-9]+)" CIVETWEB_VERSION_MATCH "${CIVETWEB_VERSION}")
 if ("${CIVETWEB_VERSION_MATCH}" STREQUAL "")
   message(FATAL_ERROR "Must specify a semantic version: major.minor.patch")
@@ -111,6 +106,10 @@ message(STATUS "Force x32 / x64 architecture - ${CIVETWEB_ARCH}")
 # LUA CGI support
 option(CIVETWEB_ENABLE_LUA "Enable Lua CGIs" OFF)
 message(STATUS "Lua CGI support - ${CIVETWEB_ENABLE_LUA}")
+
+# zlib compression support
+option(CIVETWEB_ENABLE_ZLIB "Enables zlib compression support" OFF)
+message(STATUS "zlib support - ${CIVETWEB_ENABLE_ZLIB}")
 
 # Enable installing CivetWeb executables
 option(CIVETWEB_INSTALL_EXECUTABLE "Enable installing CivetWeb executable" ON)
@@ -507,6 +506,9 @@ if (CIVETWEB_DISABLE_CACHING)
 endif()
 if (CIVETWEB_ENABLE_LUA)
   add_definitions(-DUSE_LUA)
+endif()
+if (CIVETWEB_ENABLE_ZLIB)
+  add_definitions(-DUSE_ZLIB)
 endif()
 if (CIVETWEB_ENABLE_DUKTAPE)
   add_definitions(-DUSE_DUKTAPE)
