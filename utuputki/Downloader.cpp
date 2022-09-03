@@ -236,12 +236,15 @@ Downloader::DownloaderImpl::DownloaderImpl(Utuputki &utuputki_, const Config &co
 , verbose(config.getBool("downloader", "verbose", false))
 , jsonModule(py::module::import("json"))
 , utuputkiModule(py::module::import("utuputki_dl"))
-, youtubeDLModule(py::module::import("youtube_dl"))
 , hostWhitelist({ "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be" })
 , shutdownMetadata(false)
 , shutdownDownloader(false)
 , threadsStarted(false)
 {
+	withGIL([&] () {
+		youtubeDLModule = py::module_::import("youtube_dl");
+	});
+
 	cacheDirectory = checkDirectory(cacheDirectory, "cache");
 	tempDirectory  = checkDirectory(tempDirectory,  "temp");
 
