@@ -1,7 +1,29 @@
 # A simple C++ URL class
 
+## Usage
+
+### CMake
+
+If you are developing your project with CMake you can include this library with the `find_package` mechanism of CMake.
+First, either run `make install` or include this project via `add_subdirectory`.
+Afterwards, you can link to this lib like so:
+
+```CMake
+cmake_minimum_required(VERSION 3.4)
+
+project(example_find_package)
+
+find_package(CxxUrl REQUIRED)
+
+add_executable(${PROJECT_NAME} main.cpp)
+
+target_link_libraries(${PROJECT_NAME} PUBLIC chmike::CxxUrl)
+```
+
 ### The `Url` object API
-`Url` is a C++ URL handling class with a very simple API. It's use is straigthforward.
+`Url` is a C++ URL handling class with a very simple API. It's use is straightforward.
+
+URIs that don't follow the URL standard defined in [RFC3986](https://datatracker.ietf.org/doc/html/rfc3986) might not be correctly parsed in all cases.
 
 * Construct an `Url` object
   ``` C++
@@ -77,3 +99,15 @@ output.
 
 The URL is built only when the `str()` method is called or when the `Url` object
 is output.
+
+### Testing the library
+
+In order to quickly build a static library and test the code, the following 
+sequence of bash instructions may work for you. 
+
+```
+g++ -c url.cpp
+ar rvs CxxUrl.a url.o
+g++ main.cpp CxxUrl.a
+./a.out
+```

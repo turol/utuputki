@@ -84,11 +84,6 @@ inline bool is_uint(const char *&s, const char *e, uint32_t max) {
 }
 
 
-inline bool is_pchars(const char *s, const char *e) {
-    return is_chars(s, e, 0x07);
-}
-
-
 inline char get_hex_digit(char c) {
     if (c>='0'&&c<='9')
         return c-'0';
@@ -266,7 +261,8 @@ std::string normalize_IPv6(const char *s, const char *e) {
         return std::string(s,e-s);
 
     // Split IPv6 at colons
-    const char *p=s, *tokens[10];
+    const size_t token_size = 10;
+    const char *p=s, *tokens[token_size];
     if (*p==':')
         ++p;
     if (e[-1]==':')
@@ -275,6 +271,9 @@ std::string normalize_IPv6(const char *s, const char *e) {
     size_t i=0;
     while (p!=e) {
         if (*p++==':') {
+            if (i+1 >= token_size) {
+                throw Url::parse_error("IPv6 ["+std::string(s,e-s)+"] is invalid");
+            }
             tokens[i++]=b;
             b=p;
         }
@@ -293,13 +292,17 @@ std::string normalize_IPv6(const char *s, const char *e) {
     }
 
     // Decode the fields
-    std::uint16_t fields[8];
+    const size_t fields_size = 8;
+    std::uint16_t fields[fields_size];
     size_t null_pos=8, null_len=0, nfields=0;
     for(size_t i=0; i<ntokens; ++i) {
         const char *p=tokens[i];
         if (p==tokens[i+1] || *p==':')
             null_pos=i;
         else {
+            if (nfields >= fields_size) {
+                throw Url::parse_error("IPv6 ["+std::string(s,e-s)+"] is invalid");
+            }
             std::uint16_t field=get_hex_digit(*p++);
             while (p!=tokens[i+1] && *p!=':')
                 field=(field<<4)|get_hex_digit(*p++);
@@ -309,6 +312,9 @@ std::string normalize_IPv6(const char *s, const char *e) {
     i = nfields;
     nfields=(ipv4_b)?6:8;
     if (i<nfields) {
+        if (i<null_pos) {
+            throw Url::parse_error("IPv6 ["+std::string(s,e-s)+"] is invalid");
+        }
         size_t last=nfields;
         if (i!=null_pos)
             do fields[--last]=fields[--i]; while (i!=null_pos);
@@ -462,7 +468,7 @@ class encode {
             if (is_char(c,e.m_mask))
                 o<<c;
             else
-                o<<'%'<<"0123456789ABCDEF"[c>>4]<<"0123456789ABCDEF"[c&0xF];
+                o<<'%'<<"0123456789ABCDEF"[((uint8_t)c)>>4]<<"0123456789ABCDEF"[((uint8_t)c)&0xF];
         return o;
     }
 };
@@ -489,7 +495,7 @@ class encode_query_key {
             else if (is_char(c,e.m_mask))
                 o<<c;
             else
-                o<<'%'<<"0123456789ABCDEF"[c>>4]<<"0123456789ABCDEF"[c&0xF];
+                o<<'%'<<"0123456789ABCDEF"[((uint8_t)c)>>4]<<"0123456789ABCDEF"[((uint8_t)c)&0xF];
         return o;
     }
 };
@@ -514,7 +520,7 @@ class encode_query_val {
             else if (is_char(c,e.m_mask))
                 o<<c;
             else
-                o<<'%'<<"0123456789ABCDEF"[c>>4]<<"0123456789ABCDEF"[c&0xF];
+                o<<'%'<<"0123456789ABCDEF"[((uint8_t)c)>>4]<<"0123456789ABCDEF"[((uint8_t)c)&0xF];
         return o;
     }
 };
@@ -721,7 +727,7 @@ void Url::parse_url() const {
             p=find_char(b, ea, '@');
             // get user info if any
             if (p!=ea) {
-                if (!is_chars(b, p, 0x05))
+                if (!is_chars(b, p, 0x25))
                     throw Url::parse_error("User info in '"+std::string(s,e-s)+"' is invalid");
                 user_b=b;
                 user_e=p;

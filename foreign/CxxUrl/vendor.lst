@@ -1,0 +1,10 @@
+.gitignore
+CMakeLists.txt
+CxxUrl.pro
+LICENSE
+README.md
+cmake/CxxUrlConfig.cmake.in
+main.cpp
+string.hpp
+url.cpp
+url.hpp
