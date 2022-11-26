@@ -6,12 +6,13 @@
 
   <div>
    <table>
-    <tr> <th>Id</th> <th>Title</th> <th>Duration</th> <th>Status</th> </tr>
+    <tr> <th>Id</th> <th>Thumbnail</th> <th>Title</th> <th>Duration</th> <th>Status</th> </tr>
 
 ## for media in allMedia
 
     <tr>
      <td>{{ media.id }}</td>
+     <td><img src={{media.thumbnail}}></img></td>
      {% if media.title == "" %}
      <td><a href="{{ media.url }}">{{ media.url}}</a></td>
      {% else %}
