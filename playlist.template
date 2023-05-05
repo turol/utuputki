@@ -17,14 +17,14 @@
      >Playlist is empty. Why don't you add something?</span>
    
    {% if isObject(nowPlaying) %}
-    <span id="nowplaying" class="nowplaying" data-json='{{ nowPlaying }}' >Now playing: <a href="{{ nowPlaying.url }}">{{ nowPlaying.title }}</a>&nbsp;{{ nowPlaying.elapsed }}&nbsp;/&nbsp;{{ nowPlaying.lengthReadable }}
+    <span id="nowplaying" class="nowplaying">Now playing: <a href="{{ nowPlaying.url }}">{{ nowPlaying.title }}</a>&nbsp;{{ nowPlaying.elapsed }}&nbsp;/&nbsp;{{ nowPlaying.lengthReadable }}
     <form class="skip" action="/skip" method="POST">
      <input type="hidden" id="media" name="media" value="{{ nowPlaying.mediaId }}">
      <input type="submit" value="Skip">
     </form>
     Skips:&nbsp;{{ nowPlaying.skipCount }}&nbsp;/&nbsp;{{ nowPlaying.skipsNeeded }}</span>
    {% else %}
-    <span class="nowplaying" data-json='' style="display: none;" ></span>
+    <span class="nowplaying" style="display: none;" ></span>
    {% endif %}
   </div>
 
@@ -34,7 +34,7 @@
 
 ## for media in playlist
 
-    <tr data-json='{{ media }}'>
+    <tr>
      <td>{{ media.id }}</td>
      {% if media.title == "" %}
      <td><a href="{{ media.url }}">{{ media.url}}</a></td>
