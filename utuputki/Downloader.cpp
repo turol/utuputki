@@ -241,21 +241,39 @@ Downloader::DownloaderImpl::DownloaderImpl(Utuputki &utuputki_, const Config &co
 , shutdownDownloader(false)
 , threadsStarted(false)
 {
+	std::string youtubeDlModuleName;
+
 	withGIL([&] () {
 		try {
 			youtubeDLModule = py::module_::import("yt_dlp");
 			LOG_INFO("Loaded yt-dlp");
+			youtubeDlModuleName = "yt_dlp";
+			return;
 		} catch (py::error_already_set &e) {
-			LOG_INFO("Exception loading yt-dlp: {}", e.what());
-			youtubeDLModule = py::module_::import("youtube_dl");
+			LOG_ERROR("Exception loading yt-dlp: {}", e.what());
 		}
+
+		try {
+			youtubeDLModule = py::module_::import("youtube_dl");
+			LOG_INFO("Loaded youtube-dl");
+			youtubeDlModuleName = "youtube_dl";
+			return;
+		} catch (py::error_already_set &e) {
+			LOG_ERROR("Exception loading youtube-dl: {}", e.what());
+		}
+
+		throw std::runtime_error("No yt-dlp or youtube-dl installed");
 	});
 
 	cacheDirectory = checkDirectory(cacheDirectory, "cache");
 	tempDirectory  = checkDirectory(tempDirectory,  "temp");
 
-	withGIL([] () {
-		LOG_INFO("youtube-dl version \"{}\"", pybind11::cast<std::string>(py::module::import("youtube_dl.version").attr("__version__")));
+	withGIL([&] () {
+		try {
+			LOG_INFO("youtube-dl version \"{}\"", pybind11::cast<std::string>(py::module::import((youtubeDlModuleName + ".version").c_str()).attr("__version__")));
+		} catch (py::error_already_set &e) {
+			LOG_WARNING("Couldn't get youtube-dl version: {}", e.what());
+		}
 	});
 
 	LOG_INFO("Maximum length {}",        maxLength);
