@@ -17,6 +17,7 @@ addons:
       - cmake
       - openssl
       - libssl-dev
+      - gdb
     sources:
       - kubuntu-backports
 
@@ -120,6 +121,12 @@ before_script:
     ${ADDITIONAL_CMAKE_ARGS}
     ..
   - ls -la
+  - ulimit -c unlimited -S
+
+after_failure:
+  - COREFILE=$(find . -maxdepth 1 -name "core*" | head -n 1) # find core file
+  - if [[ -f "$COREFILE" ]]; then gdb -c "$COREFILE" example -ex "thread apply all bt" -ex "set pagination 0" -batch; fi
+
 
 # Modifications due to Travis IPv6 issues:
 # https://github.com/travis-ci/travis-ci/issues/8711
@@ -132,7 +139,7 @@ script:
       make -f Makefile.osx package;
     fi
   - if [ "${RUN_UNITTEST}" == "1" ]; then
-      CTEST_OUTPUT_ON_FAILURE=1 make all test;
+      CTEST_OUTPUT_ON_FAILURE=1  CK_FORK=yes  make all test;
     fi
   - pwd
   - ls -la unittest
@@ -153,40 +160,6 @@ after_success:
       bash <(curl -s https://codecov.io/bash);
       echo "All coverage reports created";
     fi
-
-conan-linux: &conan-linux
-    os: linux
-    dist: xenial
-    language: python
-    python: "3.7"
-    services:
-      - docker
-    if: tag IS present
-    before_install:
-      - true
-    install:
-      - ./conan/travis/install.sh
-    before_script:
-      - true
-    script:
-      - ./conan/travis/build.sh
-    after_success:
-      - true
-
-conan-osx: &conan-osx
-    os: osx
-    language: generic
-    if: tag IS present
-    before_install:
-      - true
-    install:
-      - ./conan/travis/install.sh
-    before_script:
-      - true
-    script:
-      - ./conan/travis/build.sh
-    after_success:
-      - true
 
 
 #########################################################################################
@@ -543,6 +516,39 @@ matrix:
 
 
 #########################################################################################
+#####   FREEBSD BUILD   ###########=#####################################################
+#########################################################################################
+
+  -
+    os: freebsd
+    sudo: required
+    compiler: clang
+    env:
+      idx=20
+      N=Clang-FREEBSD-Complete-NoLua-Release
+      BUILD_TYPE=Release
+      ENABLE_SSL_DYNAMIC_LOADING=YES
+      OPENSSL_1_0=NO
+      OPENSSL_1_1=YES
+      ENABLE_CXX=NO
+      ENABLE_LUA_SHARED=NO
+      C_STANDARD=auto
+      CXX_STANDARD=auto
+      BUILD_SHARED=NO
+      NO_FILES=NO
+      ENABLE_SSL=YES
+      NO_CGI=NO
+      ENABLE_IPV6=YES
+      ENABLE_WEBSOCKETS=YES
+      ENABLE_SERVER_STATS=YES
+      ENABLE_LUA=NO
+      ENABLE_DUKTAPE=NO
+      NO_CACHING=NO
+      ALLOW_WARNINGS=YES
+      RUN_UNITTEST=1
+
+
+#########################################################################################
 #####   OSX BUILD   #####################################################################
 #########################################################################################
 
@@ -553,7 +559,7 @@ matrix:
     env:
       idx=8
       N=Clang-OSX-Complete-NoLua-Release-OpenSSL_1_1_NoDynLoad
-      BUILD_TYPE=OSX_OPENSSL_1_1
+      BUILD_TYPE=Release
       ENABLE_SSL_DYNAMIC_LOADING=NO
       OPENSSL_1_0=NO
       OPENSSL_1_1=YES
@@ -614,37 +620,6 @@ matrix:
 #########################################################################################
 #########################################################################################
 
-  - <<: *conan-linux
-    env: CONAN_GCC_VERSIONS=4.9 CONAN_DOCKER_IMAGE=conanio/gcc49 CONAN_DOCKER_32_IMAGES=1
-  - <<: *conan-linux
-    env: CONAN_GCC_VERSIONS=5 CONAN_DOCKER_IMAGE=conanio/gcc5 CONAN_DOCKER_32_IMAGES=1
-  - <<: *conan-linux
-    env: CONAN_GCC_VERSIONS=6 CONAN_DOCKER_IMAGE=conanio/gcc6 CONAN_DOCKER_32_IMAGES=1
-  - <<: *conan-linux
-    env: CONAN_GCC_VERSIONS=7 CONAN_DOCKER_IMAGE=conanio/gcc7 CONAN_DOCKER_32_IMAGES=1
-  - <<: *conan-linux
-    env: CONAN_GCC_VERSIONS=8 CONAN_DOCKER_IMAGE=conanio/gcc8 CONAN_DOCKER_32_IMAGES=1
-  - <<: *conan-linux
-    env: CONAN_CLANG_VERSIONS=3.9 CONAN_DOCKER_IMAGE=conanio/clang39 CONAN_DOCKER_32_IMAGES=1
-  - <<: *conan-linux
-    env: CONAN_CLANG_VERSIONS=4.0 CONAN_DOCKER_IMAGE=conanio/clang40 CONAN_DOCKER_32_IMAGES=1
-  - <<: *conan-linux
-    env: CONAN_CLANG_VERSIONS=5.0 CONAN_DOCKER_IMAGE=conanio/clang50 CONAN_DOCKER_32_IMAGES=1
-  - <<: *conan-linux
-    env: CONAN_CLANG_VERSIONS=6.0 CONAN_DOCKER_IMAGE=conanio/clang60 CONAN_DOCKER_32_IMAGES=1
-  - <<: *conan-osx
-    osx_image: xcode8.3
-    env: CONAN_APPLE_CLANG_VERSIONS=8.1
-  - <<: *conan-osx
-    osx_image: xcode9
-    env: CONAN_APPLE_CLANG_VERSIONS=9.0
-  - <<: *conan-osx
-    osx_image: xcode9.4
-    env: CONAN_APPLE_CLANG_VERSIONS=9.1
-  - <<: *conan-osx
-    osx_image: xcode10.1
-    env: CONAN_APPLE_CLANG_VERSIONS=10.0
-
 # Remove Lua build, until someone knows how to fix the CMake files
 #
 #  - dist: trusty
@@ -683,5 +658,3 @@ matrix:
 #      ENABLE_DUKTAPE=NO
 #      NO_CACHING=YES
 #      ALLOW_WARNINGS=YES
-
-

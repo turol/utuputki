@@ -1,5 +1,7 @@
-commit eefb26f82b233268fc98577d265352720d477ba4
+commit d7ba35bbb649209c66e582d5a0244ba988a15159
 Author: bel2125 <bel2125@gmail.com>
-Date:   Wed Sep 1 10:46:33 2021 +0200
+Date:   Sat Apr 8 17:38:36 2023 +0200
 
-    Visual Studio project for Release V1.15
+    Update unit test for directory listing
+    
+    After #1086, the directory listing starts with a <!DOCTYPE html> tag

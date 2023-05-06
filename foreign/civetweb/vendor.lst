@@ -1,5 +1,6 @@
 .clang-format
 .gitattributes
+.github/workflows/cifuzz.yml
 .github/workflows/codeql-analysis.yml
 .gitignore
 .travis.yml
@@ -60,18 +61,10 @@ cmake/FindLibDl.cmake
 cmake/FindLibM.cmake
 cmake/FindLibRt.cmake
 cmake/FindWinSock.cmake
-cmake/check/c82fe8888aacfe784476112edd3878256d2e30bc.patch
-cmake/check/check_run.patch
-cmake/check/patch.cmake
 cmake/civetweb-config.cmake.in
+cmake/civetweb-cpp.pc.in
+cmake/civetweb.pc.in
 codecov.yml
-conan/build.py
-conan/test_package/CMakeLists.txt
-conan/test_package/conanfile.py
-conan/test_package/test_package.cpp
-conan/travis/build.sh
-conan/travis/install.sh
-conanfile.py
 contrib/buildroot/Config.in
 contrib/buildroot/civetweb.mk
 distribution/arch/PKGBUILD.git.example
@@ -85,6 +78,7 @@ docs/OpenSSL.md
 docs/README.md
 docs/UserManual.md
 docs/_config.yml
+docs/api/mg_base64_X.md
 docs/api/mg_callbacks.md
 docs/api/mg_check_digest_access_authentication.md
 docs/api/mg_check_feature.md
@@ -127,6 +121,7 @@ docs/api/mg_init_data.md
 docs/api/mg_init_library.md
 docs/api/mg_lock_connection.md
 docs/api/mg_lock_context.md
+docs/api/mg_match.md
 docs/api/mg_md5.md
 docs/api/mg_modify_passwords_file.md
 docs/api/mg_modify_passwords_file_ha1.md
@@ -171,12 +166,19 @@ docs/api/mg_write.md
 docs/mbedtls.md
 docs/yaSSL.md
 examples/README.md
+examples/client/Makefile
+examples/client/client.c
+examples/embed_certificate/build.sh
+examples/embed_certificate/ec_example.c
 examples/embedded_c/Makefile
 examples/embedded_c/embedded_c.c
 examples/embedded_cpp/Makefile
 examples/embedded_cpp/embedded_cpp.cpp
 examples/https/README.md
 examples/https/civetweb.conf
+examples/linux_ws_server_cpp/CMakeLists.txt
+examples/linux_ws_server_cpp/README.md
+examples/linux_ws_server_cpp/main.cc
 examples/multidomain/README.md
 examples/multidomain/add_domain.conf
 examples/multidomain/base_domain.conf
@@ -190,6 +192,8 @@ examples/rest/cJSON/cJSON_Utils.h
 examples/rest/rest.c
 examples/ws_client/build.sh
 examples/ws_client/ws_client.c
+examples/ws_server/build.sh
+examples/ws_server/ws_server.c
 format.bat
 fuzztest/README.txt
 fuzztest/build.sh
@@ -263,10 +267,11 @@ src/CivetServer.cpp
 src/civetweb.c
 src/civetweb_private_lua.h
 src/handle_form.inl
+src/http2.inl
 src/main.c
+src/match.inl
 src/md5.inl
 src/mod_duktape.inl
-src/mod_http2.inl
 src/mod_lua.inl
 src/mod_lua_shared.inl
 src/mod_mbedtls.inl
@@ -274,6 +279,7 @@ src/mod_zlib.inl
 src/openssl_dl.inl
 src/response.inl
 src/sha1.inl
+src/sort.inl
 src/third_party/LuaXML.lua
 src/third_party/LuaXML_lib.c
 src/third_party/LuaXML_lib.h
@@ -1091,6 +1097,7 @@ src/third_party/lua-5.4.3/src/lvm.c
 src/third_party/lua-5.4.3/src/lvm.h
 src/third_party/lua-5.4.3/src/lzio.c
 src/third_party/lua-5.4.3/src/lzio.h
+src/third_party/lua_struct.c
 src/third_party/sqlite3.c
 src/third_party/sqlite3.h
 src/timer.inl
@@ -1104,6 +1111,7 @@ test/Image_2kB.png.gz
 test/MakefileTest.mk
 test/MethodTest.xhtml
 test/README.md
+test/access/.htpasswd
 test/ajax/echo.cgi
 test/ajax/echo.cgi.old
 test/ajax/echo.lp
@@ -1133,6 +1141,7 @@ test/error.lua
 test/error404.htm
 test/exit.lua
 test/filehandler.lua
+test/flush.php
 test/form.html
 test/handle_form.lua
 test/hello.cgi

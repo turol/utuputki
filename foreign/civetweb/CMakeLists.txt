@@ -2,6 +2,7 @@
 cmake_minimum_required (VERSION 3.3.0)
 cmake_policy(VERSION 3.2.2)
 cmake_policy(SET CMP0054 NEW)
+cmake_policy(SET CMP0057 NEW)
 
 # Set up the project
 project (civetweb)
@@ -80,7 +81,7 @@ option(CIVETWEB_ENABLE_CXX "Enables the C++ wrapper library" OFF)
 message(STATUS "C++ wrappers - ${CIVETWEB_ENABLE_CXX}")
 
 # IP Version 6
-option(CIVETWEB_ENABLE_IPV6 "Enables the IP version 6 support" OFF)
+option(CIVETWEB_ENABLE_IPV6 "Enables the IP version 6 support" ON)
 message(STATUS "IP Version 6 - ${CIVETWEB_ENABLE_IPV6}")
 
 # Websocket support
@@ -225,6 +226,10 @@ message(STATUS "Compile for OpenSSL 1.0 API - ${CIVETWEB_SSL_OPENSSL_API_1_0}")
 # OpenSSL 1.1 API
 option(CIVETWEB_SSL_OPENSSL_API_1_1 "Use the OpenSSL 1.1 API" ON)
 message(STATUS "Compile for OpenSSL 1.1 API - ${CIVETWEB_SSL_OPENSSL_API_1_1}")
+
+# OpenSSL 1.1 API
+option(CIVETWEB_SSL_OPENSSL_API_3_0 "Use the OpenSSL 3.0 API" OFF)
+message(STATUS "Compile for OpenSSL 3.0 API - ${CIVETWEB_SSL_OPENSSL_API_3_0}")
 
 # Dynamically load or link the SSL libraries
 cmake_dependent_option(
@@ -535,9 +540,19 @@ endif()
 if(CIVETWEB_SSL_OPENSSL_API_1_1)
   add_definitions(-DOPENSSL_API_1_1)
 endif()
+if(CIVETWEB_SSL_OPENSSL_API_3_0)
+  add_definitions(-DOPENSSL_API_3_0)
+endif()
 if(CIVETWEB_SSL_OPENSSL_API_1_0 AND CIVETWEB_SSL_OPENSSL_API_1_1)
   message(FATAL_ERROR "Multiple SSL API versions defined")
 endif()
+if(CIVETWEB_SSL_OPENSSL_API_1_0 AND CIVETWEB_SSL_OPENSSL_API_3_0)
+  message(FATAL_ERROR "Multiple SSL API versions defined")
+endif()
+if(CIVETWEB_SSL_OPENSSL_API_1_1 AND CIVETWEB_SSL_OPENSSL_API_3_0)
+  message(FATAL_ERROR "Multiple SSL API versions defined")
+endif()
+
 
 add_definitions(-DUSE_STACK_SIZE=${CIVETWEB_THREAD_STACK_SIZE})
 
@@ -596,7 +611,31 @@ configure_package_config_file(
   ${PROJECT_NAME}-config.cmake
   INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
   NO_CHECK_REQUIRED_COMPONENTS_MACRO
-  PATH_VARS CMAKE_INSTALL_INCLUDEDIR
+  PATH_VARS CMAKE_INSTALL_INCLUDEDIR CMAKE_INSTALL_LIBDIR CIVETWEB_ENABLE_CXX
+)
+
+configure_file(
+  cmake/${PROJECT_NAME}.pc.in
+  ${PROJECT_BINARY_DIR}/${PROJECT_NAME}.pc
+  @ONLY
+)
+
+configure_file(
+  cmake/${PROJECT_NAME}-cpp.pc.in
+  ${PROJECT_BINARY_DIR}/${PROJECT_NAME}-cpp.pc
+  @ONLY
+)
+
+install(
+  FILES 
+    "${PROJECT_BINARY_DIR}/${PROJECT_NAME}.pc"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/pkgconfig"
+)
+
+install(
+  FILES 
+    "${PROJECT_BINARY_DIR}/${PROJECT_NAME}-cpp.pc"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/pkgconfig"
 )
 
 write_basic_package_version_file(${PROJECT_NAME}-config-version.cmake

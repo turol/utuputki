@@ -92,16 +92,22 @@ Pattern match starts at the beginning of the string, so essentially
 patterns are prefix patterns. Syntax is as follows:
 
      **      Matches everything
-     *       Matches everything but slash character, '/'
-     ?       Matches any character
+     *       Matches everything but the slash character ('/')
+     ?       Matches any character but the slash character ('/')
      $       Matches the end of the string
      |       Matches if pattern on the left side or the right side matches.
 
 All other characters in the pattern match themselves. Examples:
 
-    **.cgi$      Any string that ends with .cgi
-    /foo         Any string that begins with /foo
-    **a$|**b$    Any string that ends with a or b
+    **.cgi$          Any string that ends with .cgi
+    /foo             Any string that begins with /foo
+    **a$|**b$        Any string that ends with a or b
+
+    /data/????.css$  Matches css files with 4 letter names in "/data" folder.
+    /data/*.js$      Matches all js file names in "/data" folder.
+    /api/*/*.cgi$    Matches "/api/resourcetype/resourcename.cgi"
+    /*.jpg$|/*.jpeg$ JPG and JPEG files in root folder
+    **.jpg$|**.jpeg$ JPG and JPEG files anywhere
 
 
 ## Options from `civetweb.c`
@@ -144,7 +150,7 @@ See the [Wikipedia page on CORS](http://en.wikipedia.org/wiki/Cross-origin_resou
 An Access Control List (ACL) allows restrictions to be put on the list of IP
 addresses which have access to the web server. In the case of the CivetWeb
 web server, the ACL is a comma separated list of IP subnets, where each
-subnet is pre-pended by either a `-` or a `+` sign. A plus sign means allow,
+subnet is prepended by either a `-` or a `+` sign. A plus sign means allow,
 where a minus sign means deny. If a subnet mask is omitted, such as `-1.2.3.4`,
 this means to deny only that single IP address.
 
@@ -260,6 +266,16 @@ Maximum allowed runtime for CGI scripts.  CGI processes are terminated by
 the server after this time.  The default is "no timeout", so scripts may
 run or block for undefined time.
 
+### cgi\_buffering `yes`
+Allow buffering response of CGI program before sending to the client.
+When buffering is enabled content created by CGI scripts is collected in 
+a buffer and forwarded to the client in larger blocks, improving efficiency.
+If partial content has to be sent to the client, try setting 
+`cgi_buffering` to `no`, `allow_sendfile_call` to `no` 
+and `tcp_nodelay` to `1`. This will cost some performance, but not guarantee
+there is no buffering between CGI program and client code, since intermediate 
+proxies or browsers may also buffer data.
+
 ### decode\_query\_string `no`
 URL decode all query strings in the server. 
 If you set this option to `yes`, all callbacks and scripts will only see the already
@@ -309,6 +325,11 @@ keep\_alive\_timeout\_ms to 0. Currently, this is done as a default value,
 but this configuration is redundant. In a future version, the keep\_alive
 configuration option might be removed and automatically set to `yes` if
 a timeout > 0 is set.
+
+### enable\_webdav `no`
+Set this configuration option to `yes` to handle WebDAV specific HTTP methods:
+PROPFIND, PROPPATCH, LOCK, UNLOCK, MOVE, COPY.
+These methods are not allowed if the configuration option is set to `no`.
 
 ### enable\_websocket\_ping\_pong `no`
 If this configuration value is set to `yes`, the server will send a
@@ -417,7 +438,7 @@ SSL port. For example, if `listening_ports` is `80r,443s`, then all
 HTTP traffic coming at port 80 will be redirected to HTTPS port 443.
 
 It is possible to specify an IP address to bind to. In this case,
-an IP address and a colon must be pre-pended to the port number.
+an IP address and a colon must be prepended to the port number.
 For example, to bind to a loopback interface on port 80 and to
 all interfaces on HTTPS port 443, use `127.0.0.1:80,443s`.
 
@@ -667,7 +688,7 @@ TLS1.1+TLS1.2+TLS1.3 | 3
 TLS1.2+TLS1.3 | 4
 TLS1.3 | 5
 
-TLS version 1.3 is only available if you are using an up-to-date TLS libary.
+TLS version 1.3 is only available if you are using an up-to-date TLS library.
 The default setting has been changed from 0 to 4 in CivetWeb 1.14.
 
 ### ssl\_short\_trust `no`
@@ -956,8 +977,8 @@ mg (table):
     mg.get_mime_type(filename)  -- get MIME type of a file
     mg.get_option(name)         -- get configuration option value from name
     mg.get_response_code_text(n)-- get response code text for n, nil otherwise
-    mg.get_var(str, varname, [occurance])  -- extract the first occurance of variable from (query) string
-                                --     otherwise the nth occurance if supplied, nil if not found
+    mg.get_var(str, varname, [occurrence])  -- extract the first occurrence of variable from (query) string
+                                --     otherwise the nth occurrence if supplied, nil if not found
     mg.send_file(filename)      -- send a file, including all required HTTP headers
     mg.send_file_body(filename) -- send a file, excluding HTTP headers
     mg.send_http_error(n,str)   -- send http error code n with string body
@@ -996,7 +1017,7 @@ mg (table):
          .https                 -- true if accessed by https://, false otherwise
          .remote_user           -- user name if authenticated, nil otherwise
          .auth_type             -- Digest
-         .client_cert           -- Table with ssl certificate infomation
+         .client_cert           -- Table with ssl certificate information
               .subject          -- Certificate subject
               .issuer           -- Certificate issuer
               .serial           -- Certificate serial number
@@ -1104,7 +1125,7 @@ some features of the "mg" library are not available yet. Use the "start()" callb
 function instead.
 
 A Lua background script may define the following functions:
-    `start()`        -- called wnen the server is started
+    `start()`        -- called when the server is started
     `stop()`         -- called when the server is stopped
     `log(req, res)`  -- called when an access log entry is created
 

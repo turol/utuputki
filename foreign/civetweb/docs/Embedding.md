@@ -3,8 +3,9 @@ Embedding CivetWeb
 
 CivetWeb is primarily designed so applications can easily add HTTP and HTTPS server as well as WebSocket (WS and WSS) server functionality.
 For example, a C/C++ application could use CivetWeb to enable a web service and configuration interface, to add a HTML5 data visualization interface, for automation or remote control, as a protocol gateway or as a HTTP/WebSocket client for firewall traversal.
+Often the easiest way to embed CivetWeb is to add the civetweb.c file into your existing C project (see below).
 
-It can also be used as a stand-alone executable. It can deliver static files and offers built-in server side Lua, JavaScript and CGI support. Some instructions how to build the stand-alone server can be found in [Building.md](https://github.com/civetweb/civetweb/blob/master/docs/Building.md).
+CivetWeb can also be used as a stand-alone executable. It can deliver static files and offers built-in server side Lua, JavaScript and CGI support. Some instructions how to build the stand-alone server can be found in [Building.md](https://github.com/civetweb/civetweb/blob/master/docs/Building.md).
 
 
 Files
@@ -30,7 +31,10 @@ but all functions required to run a HTTP server.
     - src/sha1.inl (SHA calculation)
     - src/handle\_form.inl (HTML form handling functions)
     - src/response.inl (helper for generating HTTP response headers)
+    - src/sort.inl (sorting, qsort_r alternative)
+    - src/match.inl (pattern matching)
     - src/timer.inl (optional timer support)
+    - src/http2.inl (optional HTTP2 support)
   - Optional: C++ wrapper
     - include/CivetServer.h (C++ interface)
     - src/CivetServer.cpp (C++ wrapper implementation)
@@ -180,6 +184,8 @@ Lua is a server side include functionality.  Files ending in .lua will be proces
   - src/third\_party/lsqlite3.c
   - src/third\_party/lfs.c
   - src/third\_party/lfs.h
+  - src/third\_party/lua_struct.c
+  
 
 This build is valid for Lua version Lua 5.2. It is also possible to build with Lua 5.1 (including LuaJIT), Lua 5.3 or Lua 5.4.
 
@@ -286,7 +292,7 @@ Initializing a HTTP server
 }
 ```
 
-A simple callback (HTTP/1.x and HTTP/2):
+A simple callback (new structure supporting HTTP/1.x and HTTP/2):
 ```C
 static int
 handler(struct mg_connection *conn, void *ignored)
@@ -302,7 +308,8 @@ handler(struct mg_connection *conn, void *ignored)
 }
 ```
 
-A simple callback supporting HTTP/1.x only:
+A simple callback (deprecated structure supporting HTTP/1.x only):
+(Note: While some older examples use this pattern, it is not recommended to it in new code.)
 ```C
 static int
 handler(struct mg_connection *conn, void *ignored)

@@ -361,7 +361,7 @@ test_mg_start(const struct mg_callbacks *callbacks,
 		/* Give the server some time to start in the test VM. */
 		/* Don't need to do this if mg_start failed. */
 		test_sleep(SLEEP_AFTER_MG_START);
-		ck_assert_int_eq(error.code, 0);
+		ck_assert_uint_eq(error.code, 0);
 		ck_assert_str_eq(error.text, "");
 	} else if (line > 0) {
 		/* mg_start is not supposed to fail anywhere, except for
@@ -383,7 +383,7 @@ static void
 test_mg_stop(struct mg_context *ctx, unsigned line)
 {
 	(void)line;
-#ifdef __MACH__
+#if defined(__MACH__) && defined(__APPLE__)
 	/* For unknown reasons, there are sporadic hangs
 	 * for OSX if mark_point is called here */
 	test_sleep(SLEEP_BEFORE_MG_STOP);
@@ -1141,14 +1141,14 @@ websock_server_data(struct mg_connection *conn,
 	}
 	mark_point();
 
-	return 1; /* return 1 to keep the connetion open */
+	return 1; /* return 1 to keep the connection open */
 }
 
 
 static void
 websock_server_close(const struct mg_connection *conn, void *udata)
 {
-#ifndef __MACH__
+#if !defined(__MACH__) && !defined(__APPLE__)
 	ck_assert_ptr_eq((void *)udata, (void *)(ptrdiff_t)7531);
 	WS_TEST_TRACE("Server: Close connection\n");
 
@@ -1225,7 +1225,7 @@ websocket_client_close_handler(const struct mg_connection *conn,
 	struct tclient_data *pclient_data =
 	    (struct tclient_data *)mg_get_user_data(ctx);
 
-#ifndef __MACH__
+#if !defined(__MACH__) && !defined(__APPLE__)
 	ck_assert_ptr_eq(user_data, (void *)pclient_data);
 
 	ck_assert(pclient_data != NULL);
@@ -1239,7 +1239,7 @@ websocket_client_close_handler(const struct mg_connection *conn,
 	(void)user_data;
 	pclient_data->closed++;
 
-#endif /* __MACH__ */
+#endif /* __MACH__ && __APPLE__ */
 }
 
 #endif /* USE_WEBSOCKET */
@@ -1801,9 +1801,9 @@ START_TEST(test_request_handlers)
 #else
 	ck_assert_int_eq(client_ri->status_code, 200);
 	i = mg_read(client_conn, buf, sizeof(buf));
-	ck_assert(i > 6);
-	buf[6] = 0;
-	ck_assert_str_eq(buf, "<html>");
+	ck_assert(i > 21);
+	buf[21] = 0;
+	ck_assert_str_eq(buf, "<!DOCTYPE html><html>");
 #endif
 	mg_close_connection(client_conn);
 
@@ -1842,10 +1842,21 @@ START_TEST(test_request_handlers)
 	client_ri = mg_get_response_info(client_conn);
 
 	ck_assert(client_ri != NULL);
+	/* Result must be an error code*/
+	ck_assert_int_gt(client_ri->status_code, 400);
+	ck_assert_int_lt(client_ri->status_code, 500);
+
 #if defined(NO_FILES)
+	/* In case there is no filesystem, PUT is not a valid method */
 	ck_assert_int_eq(client_ri->status_code, 405); /* method not allowed */
 #else
-	ck_assert_int_eq(client_ri->status_code, 401); /* not authorized */
+	/* In case there is a filesystem but no auth file is provided,
+	 * PUT is not a valid method */
+	if (client_ri->status_code != 405) {
+		/* 401: It would be possible in principle, but there client needs
+		 * to send authentication data */
+		ck_assert_int_eq(client_ri->status_code, 401); /* not authorized */
+	}
 #endif
 	mg_close_connection(client_conn);
 
@@ -3789,6 +3800,28 @@ START_TEST(test_error_handling)
 	mg_close_connection(client_conn);
 	test_sleep(1);
 
+
+	/* Try DELETE when put_delete_auth_file is not configured */
+	memset(client_err, 0, sizeof(client_err));
+	client_conn =
+	    mg_connect_client("127.0.0.1", 8080, 0, client_err, sizeof(client_err));
+
+	ck_assert_str_eq(client_err, "");
+	ck_assert(client_conn != NULL);
+
+	mg_printf(client_conn, "DELETE /something/not/existing HTTP/1.0\r\n\r\n");
+	client_res =
+	    mg_get_response(client_conn, client_err, sizeof(client_err), 10000);
+	ck_assert_int_ge(client_res, 0);
+	ck_assert_str_eq(client_err, "");
+	client_ri = mg_get_response_info(client_conn);
+	ck_assert(client_ri != NULL);
+
+	ck_assert_int_eq(client_ri->status_code, 405);
+	mg_close_connection(client_conn);
+	test_sleep(1);
+
+
 	/* Create an error.htm file */
 	f = fopen("error.htm", "wt");
 	ck_assert(f != NULL);
@@ -4329,7 +4362,7 @@ START_TEST(test_large_file)
 	OPTIONS[opt_cnt++] = "8443s";
 	OPTIONS[opt_cnt++] = "ssl_certificate";
 	OPTIONS[opt_cnt++] = ssl_cert;
-#ifdef __MACH__
+#if defined(__MACH__) && defined(__APPLE__)
 	/* The Apple builds on Travis CI seem to have problems with TLS1.x
 	 * Allow SSLv3 and TLS */
 	OPTIONS[opt_cnt++] = "ssl_protocol_version";
@@ -4602,143 +4635,6 @@ START_TEST(test_mg_store_body)
 END_TEST
 
 
-#if defined(MG_USE_OPEN_FILE) && !defined(NO_FILES)
-
-#define FILE_IN_MEM_SIZE (1024 * 100)
-static char *file_in_mem_data;
-
-static const char *
-test_file_in_memory_open_file(const struct mg_connection *conn,
-                              const char *file_path,
-                              size_t *file_size)
-{
-	(void)conn;
-
-	if (strcmp(file_path, "./file_in_mem") == 0) {
-		/* File is in memory */
-		*file_size = FILE_IN_MEM_SIZE;
-		return file_in_mem_data;
-	} else {
-		/* File is not in memory */
-		return NULL;
-	}
-}
-
-
-START_TEST(test_file_in_memory)
-{
-	/* Server var */
-	struct mg_context *ctx;
-	struct mg_callbacks callbacks;
-	const char *OPTIONS[32];
-	int opt_cnt = 0;
-#if !defined(NO_SSL)
-	const char *ssl_cert = locate_ssl_cert();
-#endif
-
-	/* Client var */
-	struct mg_connection *client;
-	char client_err_buf[256];
-	char client_data_buf[256];
-	const struct mg_request_info *client_ri;
-	int64_t data_read;
-	int r, i;
-
-	/* Prepare test data */
-	file_in_mem_data = (char *)malloc(FILE_IN_MEM_SIZE);
-	ck_assert_ptr_ne(file_in_mem_data, NULL);
-	for (r = 0; r < FILE_IN_MEM_SIZE; r++) {
-		file_in_mem_data[r] = (char)(r);
-	}
-
-	/* Set options and start server */
-	OPTIONS[opt_cnt++] = "document_root";
-	OPTIONS[opt_cnt++] = ".";
-#if defined(NO_SSL)
-	OPTIONS[opt_cnt++] = "listening_ports";
-	OPTIONS[opt_cnt++] = "8080";
-#else
-	OPTIONS[opt_cnt++] = "listening_ports";
-	OPTIONS[opt_cnt++] = "8443s";
-	OPTIONS[opt_cnt++] = "ssl_certificate";
-	OPTIONS[opt_cnt++] = ssl_cert;
-	ck_assert(ssl_cert != NULL);
-#endif
-	OPTIONS[opt_cnt] = NULL;
-
-
-	memset(&callbacks, 0, sizeof(callbacks));
-	callbacks.open_file = test_file_in_memory_open_file;
-
-	ctx = test_mg_start(&callbacks, 0, OPTIONS, __LINE__);
-	ck_assert(ctx != NULL);
-
-	/* connect client */
-	memset(client_err_buf, 0, sizeof(client_err_buf));
-	memset(client_data_buf, 0, sizeof(client_data_buf));
-
-	client =
-	    mg_download("127.0.0.1",
-#if defined(NO_SSL)
-	                8080,
-	                0,
-#else
-	                8443,
-	                1,
-#endif
-	                client_err_buf,
-	                sizeof(client_err_buf),
-	                "GET /file_in_mem HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
-
-	ck_assert(client != NULL);
-	ck_assert_str_eq(client_err_buf, "");
-
-	client_ri = mg_get_response_info(client);
-
-	ck_assert(client_ri != NULL);
-	ck_assert_int_eq(client_ri->status_code, 200);
-
-	ck_assert_int_eq(client_ri->content_length, FILE_IN_MEM_SIZE);
-
-	data_read = 0;
-	while (data_read < client_ri->content_length) {
-		r = mg_read(client, client_data_buf, sizeof(client_data_buf));
-		if (r > 0) {
-			for (i = 0; i < r; i++) {
-				ck_assert_int_eq((int)client_data_buf[i],
-				                 (int)file_in_mem_data[data_read + i]);
-			}
-			data_read += r;
-		}
-	}
-
-	/* Nothing left to read */
-	r = mg_read(client, client_data_buf, sizeof(client_data_buf));
-	ck_assert_int_eq(r, 0);
-
-	/* Close the client connection */
-	mg_close_connection(client);
-
-	/* Stop the server */
-	test_mg_stop(ctx, __LINE__);
-
-	/* Free test data */
-	free(file_in_mem_data);
-	file_in_mem_data = NULL;
-}
-END_TEST
-
-#else /* defined(MG_USE_OPEN_FILE) */
-
-START_TEST(test_file_in_memory)
-{
-	mark_point();
-}
-END_TEST
-
-#endif
-
-
 static void
 minimal_http_https_client_impl(const char *server,
                                uint16_t port,
@@ -4878,6 +4774,7 @@ START_TEST(test_minimal_tls_client)
 	const char *external_server_ip;
 	mark_point();
 	external_server_ip = get_external_server_ip();
+	(void)external_server_ip; /* unused in some cases */
 	mark_point();
 
 #if !defined(NO_SSL) /* dont run https test if SSL is not enabled */
@@ -4995,8 +4892,8 @@ START_TEST(test_minimal_http_server_callback)
 	/* Call a test client */
 	minimal_http_client_check("127.0.0.1",
 	                          8080,
-	                          "/8?Altenative=Response",
-	                          "Altenative=Response");
+	                          "/8?Alternative=Response",
+	                          "Alternative=Response");
 
 	/* Run the server for 5 seconds */
 	test_sleep(5);
@@ -5103,8 +5000,8 @@ START_TEST(test_minimal_https_server_callback)
 	/* Call a test client */
 	minimal_https_client_check("127.0.0.1",
 	                           8443,
-	                           "/8?Altenative=Response",
-	                           "Altenative=Response");
+	                           "/8?Alternative=Response",
+	                           "Alternative=Response");
 
 	/* Run the server for 5 seconds */
 	test_sleep(5);
@@ -5236,10 +5133,6 @@ make_public_server_suite(void)
 	tcase_set_timeout(tcase_large_file, civetweb_mid_server_test_timeout);
 	suite_add_tcase(suite, tcase_large_file);
 
-	tcase_add_test(tcase_file_in_mem, test_file_in_memory);
-	tcase_set_timeout(tcase_file_in_mem, civetweb_mid_server_test_timeout);
-	suite_add_tcase(suite, tcase_file_in_mem);
-
 	return suite;
 }
 #endif
@@ -5282,7 +5175,6 @@ MAIN_PUBLIC_SERVER(void)
 	test_error_log_file(0);
 	test_throttle(0);
 	test_large_file(0);
-	test_file_in_memory(0);
 
 	mg_exit_library();
 

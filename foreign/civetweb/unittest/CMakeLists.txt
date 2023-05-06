@@ -5,41 +5,27 @@ else()
   set(THIRD_PARTY_LOGGING 1)
 endif()
 
+message(STATUS "CMAKE UNIT TEST LINE 8")
+
 # We use the check unit testing framework for our C unit tests
 include(ExternalProject)
-if(NOT WIN32)
-  # Apply the patch to check to fix CMake building on OS X
-  set(CHECK_PATCH_COMMAND patch
-     ${CIVETWEB_THIRD_PARTY_DIR}/src/check-unit-test-framework/src/check_run.c
-     ${CMAKE_SOURCE_DIR}/cmake/check/check_run.patch
-   )
-else()
-  set(CHECK_PATCH_COMMAND "")
-endif()
-
 IF (DEFINED ENV{CHECK_URL})
 SET (CHECK_URL $ENV{CHECK_URL})
 ELSE()
 SET (CHECK_URL "https://github.com/civetweb/check/archive/master.zip")
 ENDIF()
 
+## Print what version of the CHECK unit test framework we are using
+message(STATUS "Using check unit test framework from ${CHECK_URL}")
 
 ExternalProject_Add(check-unit-test-framework
   DEPENDS civetweb-c-library
-
-## Use an official, released check version:
-#  URL "https://codeload.github.com/libcheck/check/zip/${CIVETWEB_CHECK_VERSION}"
-#  DOWNLOAD_NAME "${CIVETWEB_CHECK_VERSION}.zip"
-#  URL_MD5 ${CIVETWEB_CHECK_MD5_HASH}
-
-## Use a civetweb specific patched version
 
 URL ${CHECK_URL}
 DOWNLOAD_NAME "master.zip"
 
   PREFIX "${CIVETWEB_THIRD_PARTY_DIR}"
   BUILD_IN_SOURCE 1
-  PATCH_COMMAND ${CHECK_PATCH_COMMAND}
   CMAKE_ARGS
     "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
     "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
@@ -50,7 +36,8 @@ DOWNLOAD_NAME "master.zip"
   LOG_BUILD ${THIRD_PARTY_LOGGING}
   LOG_TEST ${THIRD_PARTY_LOGGING}
   LOG_INSTALL ${THIRD_PARTY_LOGGING})
-
+  
+  
 ExternalProject_Get_Property(check-unit-test-framework INSTALL_DIR)
 set(CHECK_INSTALL_DIR ${INSTALL_DIR})
 unset(INSTALL_DIR)
@@ -181,6 +168,7 @@ civetweb_add_test(PublicFunc "Options")
 civetweb_add_test(PublicFunc "MIME types")
 civetweb_add_test(PublicFunc "strcasecmp")
 civetweb_add_test(PublicFunc "URL encoding decoding")
+civetweb_add_test(PublicFunc "BASE64 encoding decoding")
 civetweb_add_test(PublicFunc "Cookies and variables")
 civetweb_add_test(PublicFunc "MD5")
 civetweb_add_test(PublicFunc "Aux functions")
@@ -206,7 +194,6 @@ civetweb_add_test(PublicServer "Error handling")
 civetweb_add_test(PublicServer "Error logging")
 civetweb_add_test(PublicServer "Limit speed")
 civetweb_add_test(PublicServer "Large file")
-civetweb_add_test(PublicServer "File in memory")
 
 # Timer tests
 civetweb_add_test(Timer "Timer Single Shot")
