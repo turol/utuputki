@@ -82,6 +82,8 @@ include/pybind11/detail/internals.h
 include/pybind11/detail/type_caster_base.h
 include/pybind11/detail/typeid.h
 include/pybind11/eigen.h
+include/pybind11/eigen/matrix.h
+include/pybind11/eigen/tensor.h
 include/pybind11/embed.h
 include/pybind11/eval.h
 include/pybind11/functional.h
@@ -110,6 +112,7 @@ tests/conftest.py
 tests/constructor_stats.h
 tests/cross_module_gil_utils.cpp
 tests/cross_module_interleaved_error_already_set.cpp
+tests/eigen_tensor_avoid_stl_array.cpp
 tests/env.py
 tests/extra_python_package/pytest.ini
 tests/extra_python_package/test_files.py
@@ -158,8 +161,11 @@ tests/test_custom_type_setup.cpp
 tests/test_custom_type_setup.py
 tests/test_docstring_options.cpp
 tests/test_docstring_options.py
-tests/test_eigen.cpp
-tests/test_eigen.py
+tests/test_eigen_matrix.cpp
+tests/test_eigen_matrix.py
+tests/test_eigen_tensor.cpp
+tests/test_eigen_tensor.inl
+tests/test_eigen_tensor.py
 tests/test_embed/CMakeLists.txt
 tests/test_embed/catch.cpp
 tests/test_embed/external_module.cpp
