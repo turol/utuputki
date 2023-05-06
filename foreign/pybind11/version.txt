@@ -1,8 +1,18 @@
-commit 0694ec6a15863bff2e0ea5efe07c78de39b9a33c
+commit 0bd8896a4010f2d91b2340570c24fa08606ec406
 Author: Henry Schreiner <HenrySchreinerIII@gmail.com>
-Date:   Tue Dec 20 17:57:47 2022 -0500
+Date:   Tue Jan 3 11:34:22 2023 -0500
 
-    chore: preapre for 2.10.2 release (#4414)
+    chore: prepare for 2.10.3 (#4437)
+    
+    * docs: update changelog for v2.10.3
+    
+    Signed-off-by: Henry Schreiner <henryschreineriii@gmail.com>
+    
+    * chore: bump versions for 2.10.3
+    
+    Signed-off-by: Henry Schreiner <henryschreineriii@gmail.com>
+    
+    * chore: fix make changelog script with entry is empty
     
     Signed-off-by: Henry Schreiner <henryschreineriii@gmail.com>
     
