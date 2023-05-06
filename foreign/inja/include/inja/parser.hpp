@@ -5,7 +5,6 @@
 #include <stack>
 #include <string>
 #include <utility>
-#include <queue>
 #include <vector>
 
 #include "config.hpp"
@@ -17,40 +16,34 @@
 #include "token.hpp"
 #include "utils.hpp"
 
-#include <nlohmann/json.hpp>
-
 namespace inja {
 
 /*!
  * \brief Class for parsing an inja Template.
  */
 class Parser {
-  const ParserConfig &config;
+  using Arguments = std::vector<std::shared_ptr<ExpressionNode>>;
+  using OperatorStack = std::stack<std::shared_ptr<FunctionNode>>;
+
+  const ParserConfig& config;
 
   Lexer lexer;
-  TemplateStorage &template_storage;
-  const FunctionStorage &function_storage;
+  TemplateStorage& template_storage;
+  const FunctionStorage& function_storage;
 
   Token tok, peek_tok;
   bool have_peek_tok {false};
 
-  size_t current_paren_level {0};
-  size_t current_bracket_level {0};
-  size_t current_brace_level {0};
+  std::string_view literal_start;
 
-  nonstd::string_view json_literal_start;
+  BlockNode* current_block {nullptr};
+  ExpressionListNode* current_expression_list {nullptr};
 
-  BlockNode *current_block {nullptr};
-  ExpressionListNode *current_expression_list {nullptr};
-  std::stack<std::pair<FunctionNode*, size_t>> function_stack;
-  std::vector<std::shared_ptr<ExpressionNode>> arguments;
-
-  std::stack<std::shared_ptr<FunctionNode>> operator_stack;
   std::stack<IfStatementNode*> if_statement_stack;
   std::stack<ForStatementNode*> for_statement_stack;
   std::stack<BlockStatementNode*> block_statement_stack;
 
-  inline void throw_parser_error(const std::string &message) {
+  inline void throw_parser_error(const std::string& message) const {
     INJA_THROW(ParserError(message, lexer.current_position()));
   }
 
@@ -70,14 +63,18 @@ class Parser {
     }
   }
 
-  inline void add_json_literal(const char* content_ptr) {
-    nonstd::string_view json_text(json_literal_start.data(), tok.text.data() - json_literal_start.data() + tok.text.size());
-    arguments.emplace_back(std::make_shared<LiteralNode>(json::parse(json_text), json_text.data() - content_ptr));
+  inline void add_literal(Arguments &arguments, const char* content_ptr) {
+    std::string_view data_text(literal_start.data(), tok.text.data() - literal_start.data() + tok.text.size());
+    arguments.emplace_back(std::make_shared<LiteralNode>(data_text, data_text.data() - content_ptr));
   }
 
-  inline void add_operator() {
+  inline void add_operator(Arguments &arguments, OperatorStack &operator_stack) {
     auto function = operator_stack.top();
     operator_stack.pop();
+
+    if (static_cast<int>(arguments.size()) < function->number_args) {
+      throw_parser_error("too few arguments");
+    }
 
     for (int i = 0; i < function->number_args; ++i) {
       function->arguments.insert(function->arguments.begin(), arguments.back());
@@ -86,53 +83,95 @@ class Parser {
     arguments.emplace_back(function);
   }
 
-  void add_to_template_storage(nonstd::string_view path, std::string& template_name) {
-    if (config.search_included_templates_in_files && template_storage.find(template_name) == template_storage.end()) {
+  void add_to_template_storage(std::string_view path, std::string& template_name) {
+    if (template_storage.find(template_name) != template_storage.end()) {
+      return;
+    }
+
+    std::string original_path = static_cast<std::string>(path);
+    std::string original_name = template_name;
+
+    if (config.search_included_templates_in_files) {
       // Build the relative path
-      template_name = static_cast<std::string>(path) + template_name;
+      template_name = original_path + original_name;
       if (template_name.compare(0, 2, "./") == 0) {
         template_name.erase(0, 2);
       }
 
       if (template_storage.find(template_name) == template_storage.end()) {
-        auto include_template = Template(load_file(template_name));
-        template_storage.emplace(template_name, include_template);
-        parse_into_template(template_storage[template_name], template_name);
+        // Load file
+        std::ifstream file;
+        file.open(template_name);
+        if (!file.fail()) {
+          std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+          auto include_template = Template(text);
+          template_storage.emplace(template_name, include_template);
+          parse_into_template(template_storage[template_name], template_name);
+          return;
+        } else if (!config.include_callback) {
+          INJA_THROW(FileError("failed accessing file at '" + template_name + "'"));
+        }
       }
+    }
+
+    // Try include callback
+    if (config.include_callback) {
+      auto include_template = config.include_callback(original_path, original_name);
+      template_storage.emplace(template_name, include_template);
     }
   }
 
-  bool parse_expression(Template &tmpl, Token::Kind closing) {
-    while (tok.kind != closing && tok.kind != Token::Kind::Eof) {
+  std::string parse_filename() const {
+    if (tok.kind != Token::Kind::String) {
+      throw_parser_error("expected string, got '" + tok.describe() + "'");
+    }
+
+    if (tok.text.length() < 2) {
+      throw_parser_error("expected filename, got '" + static_cast<std::string>(tok.text) + "'");
+    }
+
+    // Remove first and last character ""
+    return std::string {tok.text.substr(1, tok.text.length() - 2)};
+  }
+
+  bool parse_expression(Template& tmpl, Token::Kind closing) {
+    current_expression_list->root = parse_expression(tmpl);
+    return tok.kind == closing;
+  }
+
+  std::shared_ptr<ExpressionNode> parse_expression(Template& tmpl) {
+    size_t current_bracket_level {0};
+    size_t current_brace_level {0};
+    Arguments arguments;
+    OperatorStack operator_stack;
+
+    while (tok.kind != Token::Kind::Eof) {
       // Literals
       switch (tok.kind) {
       case Token::Kind::String: {
         if (current_brace_level == 0 && current_bracket_level == 0) {
-          json_literal_start = tok.text;
-          add_json_literal(tmpl.content.c_str());
+          literal_start = tok.text;
+          add_literal(arguments, tmpl.content.c_str());
         }
-
       } break;
       case Token::Kind::Number: {
         if (current_brace_level == 0 && current_bracket_level == 0) {
-          json_literal_start = tok.text;
-          add_json_literal(tmpl.content.c_str());
+          literal_start = tok.text;
+          add_literal(arguments, tmpl.content.c_str());
         }
-
       } break;
       case Token::Kind::LeftBracket: {
         if (current_brace_level == 0 && current_bracket_level == 0) {
-          json_literal_start = tok.text;
+          literal_start = tok.text;
         }
         current_bracket_level += 1;
-
       } break;
       case Token::Kind::LeftBrace: {
         if (current_brace_level == 0 && current_bracket_level == 0) {
-          json_literal_start = tok.text;
+          literal_start = tok.text;
         }
         current_brace_level += 1;
-
       } break;
       case Token::Kind::RightBracket: {
         if (current_bracket_level == 0) {
@@ -141,9 +180,8 @@ class Parser {
 
         current_bracket_level -= 1;
         if (current_brace_level == 0 && current_bracket_level == 0) {
-          add_json_literal(tmpl.content.c_str());
+          add_literal(arguments, tmpl.content.c_str());
         }
-
       } break;
       case Token::Kind::RightBrace: {
         if (current_brace_level == 0) {
@@ -152,35 +190,57 @@ class Parser {
 
         current_brace_level -= 1;
         if (current_brace_level == 0 && current_bracket_level == 0) {
-          add_json_literal(tmpl.content.c_str());
+          add_literal(arguments, tmpl.content.c_str());
         }
-
       } break;
       case Token::Kind::Id: {
         get_peek_token();
 
-        // Json Literal
-        if (tok.text == static_cast<decltype(tok.text)>("true") || tok.text == static_cast<decltype(tok.text)>("false") || tok.text == static_cast<decltype(tok.text)>("null")) {
+        // Data Literal
+        if (tok.text == static_cast<decltype(tok.text)>("true") || tok.text == static_cast<decltype(tok.text)>("false") ||
+            tok.text == static_cast<decltype(tok.text)>("null")) {
           if (current_brace_level == 0 && current_bracket_level == 0) {
-            json_literal_start = tok.text;
-            add_json_literal(tmpl.content.c_str());
+            literal_start = tok.text;
+            add_literal(arguments, tmpl.content.c_str());
           }
 
-	      // Operator
+          // Operator
         } else if (tok.text == "and" || tok.text == "or" || tok.text == "in" || tok.text == "not") {
           goto parse_operator;
 
-        // Functions
+          // Functions
         } else if (peek_tok.kind == Token::Kind::LeftParen) {
-          operator_stack.emplace(std::make_shared<FunctionNode>(static_cast<std::string>(tok.text), tok.text.data() - tmpl.content.c_str()));
-          function_stack.emplace(operator_stack.top().get(), current_paren_level);       
+          auto func = std::make_shared<FunctionNode>(tok.text, tok.text.data() - tmpl.content.c_str());
+          get_next_token();
+          do {
+            get_next_token();
+            auto expr = parse_expression(tmpl);
+            if (!expr) {
+              break;
+            }
+            func->number_args += 1;
+            func->arguments.emplace_back(expr);
+          } while (tok.kind == Token::Kind::Comma);
+          if (tok.kind != Token::Kind::RightParen) {
+            throw_parser_error("expected right parenthesis, got '" + tok.describe() + "'");
+          }
 
-        // Variables
+          auto function_data = function_storage.find_function(func->name, func->number_args);
+          if (function_data.operation == FunctionStorage::Operation::None) {
+            throw_parser_error("unknown function " + func->name);
+          }
+          func->operation = function_data.operation;
+          if (function_data.operation == FunctionStorage::Operation::Callback) {
+            func->callback = function_data.callback;
+          }
+          arguments.emplace_back(func);
+
+          // Variables
         } else {
-          arguments.emplace_back(std::make_shared<JsonNode>(static_cast<std::string>(tok.text), tok.text.data() - tmpl.content.c_str()));
+          arguments.emplace_back(std::make_shared<DataNode>(static_cast<std::string>(tok.text), tok.text.data() - tmpl.content.c_str()));
         }
 
-      // Operators
+        // Operators
       } break;
       case Token::Kind::Equal:
       case Token::Kind::NotEqual:
@@ -196,7 +256,7 @@ class Parser {
       case Token::Kind::Percent:
       case Token::Kind::Dot: {
 
-  parse_operator:
+      parse_operator:
         FunctionStorage::Operation operation;
         switch (tok.kind) {
         case Token::Kind::Id: {
@@ -257,93 +317,58 @@ class Parser {
         }
         auto function_node = std::make_shared<FunctionNode>(operation, tok.text.data() - tmpl.content.c_str());
 
-        while (!operator_stack.empty() && ((operator_stack.top()->precedence > function_node->precedence) || (operator_stack.top()->precedence == function_node->precedence && function_node->associativity == FunctionNode::Associativity::Left)) && (operator_stack.top()->operation != FunctionStorage::Operation::ParenLeft)) {
-          add_operator();
+        while (!operator_stack.empty() &&
+               ((operator_stack.top()->precedence > function_node->precedence) ||
+                (operator_stack.top()->precedence == function_node->precedence && function_node->associativity == FunctionNode::Associativity::Left))) {
+          add_operator(arguments, operator_stack);
         }
 
         operator_stack.emplace(function_node);
-
       } break;
       case Token::Kind::Comma: {
         if (current_brace_level == 0 && current_bracket_level == 0) {
-          if (function_stack.empty()) {
-            throw_parser_error("unexpected ','");
-          }
-
-          function_stack.top().first->number_args += 1;
+          goto break_loop;
         }
-
       } break;
       case Token::Kind::Colon: {
         if (current_brace_level == 0 && current_bracket_level == 0) {
           throw_parser_error("unexpected ':'");
         }
-
       } break;
       case Token::Kind::LeftParen: {
-        current_paren_level += 1;
-        operator_stack.emplace(std::make_shared<FunctionNode>(FunctionStorage::Operation::ParenLeft, tok.text.data() - tmpl.content.c_str()));
-
-        get_peek_token();
-        if (peek_tok.kind == Token::Kind::RightParen) {
-          if (!function_stack.empty() && function_stack.top().second == current_paren_level - 1) {
-            function_stack.top().first->number_args = 0;
-          }
+        get_next_token();
+        auto expr = parse_expression(tmpl);
+        if (tok.kind != Token::Kind::RightParen) {
+            throw_parser_error("expected right parenthesis, got '" + tok.describe() + "'");
         }
-
+        if (!expr) {
+          throw_parser_error("empty expression in parentheses");
+        }
+        arguments.emplace_back(expr);
       } break;
-      case Token::Kind::RightParen: {
-        current_paren_level -= 1;
-        while (!operator_stack.empty() && operator_stack.top()->operation != FunctionStorage::Operation::ParenLeft) {
-          add_operator();
-        }
-
-        if (!operator_stack.empty() && operator_stack.top()->operation == FunctionStorage::Operation::ParenLeft) {
-          operator_stack.pop();
-        }
-
-        if (!function_stack.empty() && function_stack.top().second == current_paren_level) {
-          auto func = function_stack.top().first;
-          auto function_data = function_storage.find_function(func->name, func->number_args);
-          if (function_data.operation == FunctionStorage::Operation::None) {
-            throw_parser_error("unknown function " + func->name);
-          }
-          func->operation = function_data.operation;
-          if (function_data.operation == FunctionStorage::Operation::Callback) {
-            func->callback = function_data.callback;
-          }
-
-          if (operator_stack.empty()) {
-            throw_parser_error("internal error at function " + func->name);
-          }
-
-          add_operator();
-          function_stack.pop();
-        }
-      }
       default:
-        break;
+        goto break_loop;
       }
 
       get_next_token();
     }
 
+  break_loop:
     while (!operator_stack.empty()) {
-      add_operator();
+      add_operator(arguments, operator_stack);
     }
 
+    std::shared_ptr<ExpressionNode> expr;
     if (arguments.size() == 1) {
-      current_expression_list->root = arguments[0];
+      expr = arguments[0];
       arguments = {};
-
     } else if (arguments.size() > 1) {
       throw_parser_error("malformed expression");
     }
-    
-    return true;
+    return expr;
   }
 
-  bool parse_statement(Template &tmpl, Token::Kind closing, nonstd::string_view path) {
+  bool parse_statement(Template& tmpl, Token::Kind closing, std::string_view path) {
     if (tok.kind != Token::Kind::Id) {
       return false;
     }
@@ -360,12 +385,11 @@ class Parser {
       if (!parse_expression(tmpl, closing)) {
         return false;
       }
-
     } else if (tok.text == static_cast<decltype(tok.text)>("else")) {
       if (if_statement_stack.empty()) {
         throw_parser_error("else without matching if");
       }
-      auto &if_statement_data = if_statement_stack.top();
+      auto& if_statement_data = if_statement_stack.top();
       get_next_token();
 
       if_statement_data->has_false_statement = true;
@@ -385,7 +409,6 @@ class Parser {
           return false;
         }
       }
-
     } else if (tok.text == static_cast<decltype(tok.text)>("endif")) {
       if (if_statement_stack.empty()) {
         throw_parser_error("endif without matching if");
@@ -396,12 +419,11 @@ class Parser {
         if_statement_stack.pop();
       }
 
-      auto &if_statement_data = if_statement_stack.top();
+      auto& if_statement_data = if_statement_stack.top();
       get_next_token();
 
       current_block = if_statement_data->parent;
       if_statement_stack.pop();
-
     } else if (tok.text == static_cast<decltype(tok.text)>("block")) {
       get_next_token();
 
@@ -421,18 +443,16 @@ class Parser {
       }
 
       get_next_token();
-
     } else if (tok.text == static_cast<decltype(tok.text)>("endblock")) {
       if (block_statement_stack.empty()) {
         throw_parser_error("endblock without matching block");
       }
 
-      auto &block_statement_data = block_statement_stack.top();
+      auto& block_statement_data = block_statement_stack.top();
       get_next_token();
 
       current_block = block_statement_data->parent;
       block_statement_stack.pop();
-
     } else if (tok.text == static_cast<decltype(tok.text)>("for")) {
       get_next_token();
 
@@ -456,11 +476,13 @@ class Parser {
         value_token = tok;
         get_next_token();
 
-        for_statement_node = std::make_shared<ForObjectStatementNode>(static_cast<std::string>(key_token.text), static_cast<std::string>(value_token.text), current_block, tok.text.data() - tmpl.content.c_str());
+        for_statement_node = std::make_shared<ForObjectStatementNode>(static_cast<std::string>(key_token.text), static_cast<std::string>(value_token.text),
+                                                                      current_block, tok.text.data() - tmpl.content.c_str());
 
-      // Array type
+        // Array type
       } else {
-        for_statement_node = std::make_shared<ForArrayStatementNode>(static_cast<std::string>(value_token.text), current_block, tok.text.data() - tmpl.content.c_str());
+        for_statement_node =
+            std::make_shared<ForArrayStatementNode>(static_cast<std::string>(value_token.text), current_block, tok.text.data() - tmpl.content.c_str());
       }
 
       current_block->nodes.emplace_back(for_statement_node);
@@ -476,46 +498,34 @@ class Parser {
       if (!parse_expression(tmpl, closing)) {
         return false;
       }
-
     } else if (tok.text == static_cast<decltype(tok.text)>("endfor")) {
       if (for_statement_stack.empty()) {
         throw_parser_error("endfor without matching for");
       }
 
-      auto &for_statement_data = for_statement_stack.top();
+      auto& for_statement_data = for_statement_stack.top();
       get_next_token();
 
       current_block = for_statement_data->parent;
       for_statement_stack.pop();
-
     } else if (tok.text == static_cast<decltype(tok.text)>("include")) {
       get_next_token();
 
-      if (tok.kind != Token::Kind::String) {
-        throw_parser_error("expected string, got '" + tok.describe() + "'");
-      }
-
-      std::string template_name = json::parse(tok.text).get_ref<const std::string &>();
+      std::string template_name = parse_filename();
       add_to_template_storage(path, template_name);
 
       current_block->nodes.emplace_back(std::make_shared<IncludeStatementNode>(template_name, tok.text.data() - tmpl.content.c_str()));
 
       get_next_token();
-
     } else if (tok.text == static_cast<decltype(tok.text)>("extends")) {
       get_next_token();
 
-      if (tok.kind != Token::Kind::String) {
-        throw_parser_error("expected string, got '" + tok.describe() + "'");
-      }
-
-      std::string template_name = json::parse(tok.text).get_ref<const std::string &>();
+      std::string template_name = parse_filename();
       add_to_template_storage(path, template_name);
 
       current_block->nodes.emplace_back(std::make_shared<ExtendsStatementNode>(template_name, tok.text.data() - tmpl.content.c_str()));
 
       get_next_token();
-
     } else if (tok.text == static_cast<decltype(tok.text)>("set")) {
       get_next_token();
 
@@ -538,14 +548,13 @@ class Parser {
       if (!parse_expression(tmpl, closing)) {
         return false;
       }
-
     } else {
       return false;
     }
     return true;
   }
 
-  void parse_into(Template &tmpl, nonstd::string_view path) {
+  void parse_into(Template& tmpl, std::string_view path) {
     lexer.start(tmpl.content);
     current_block = &tmpl.root;
 
@@ -559,7 +568,8 @@ class Parser {
         if (!for_statement_stack.empty()) {
           throw_parser_error("unmatched for");
         }
-      } return;
+      }
+        return;
       case Token::Kind::Text: {
         current_block->nodes.emplace_back(std::make_shared<TextNode>(tok.text.data() - tmpl.content.c_str(), tok.text.size()));
       } break;
@@ -589,10 +599,6 @@ class Parser {
         current_expression_list = expression_list_node.get();
 
         if (!parse_expression(tmpl, Token::Kind::ExpressionClose)) {
-          throw_parser_error("expected expression, got '" + tok.describe() + "'");
-        }
-
-        if (tok.kind != Token::Kind::ExpressionClose) {
           throw_parser_error("expected expression close, got '" + tok.describe() + "'");
         }
       } break;
@@ -609,33 +615,31 @@ class Parser {
     }
   }
 
-
 public:
-  explicit Parser(const ParserConfig &parser_config, const LexerConfig &lexer_config,
-                  TemplateStorage &template_storage, const FunctionStorage &function_storage)
-      : config(parser_config), lexer(lexer_config), template_storage(template_storage), function_storage(function_storage) { }
+  explicit Parser(const ParserConfig& parser_config, const LexerConfig& lexer_config, TemplateStorage& template_storage,
+                  const FunctionStorage& function_storage)
+      : config(parser_config), lexer(lexer_config), template_storage(template_storage), function_storage(function_storage) {}
 
-  Template parse(nonstd::string_view input, nonstd::string_view path) {
+  Template parse(std::string_view input, std::string_view path) {
     auto result = Template(static_cast<std::string>(input));
     parse_into(result, path);
     return result;
   }
 
-  Template parse(nonstd::string_view input) {
-    return parse(input, "./");
-  }
-
-  void parse_into_template(Template& tmpl, nonstd::string_view filename) {
-    nonstd::string_view path = filename.substr(0, filename.find_last_of("/\\") + 1);
+  void parse_into_template(Template& tmpl, std::string_view filename) {
+    std::string_view path = filename.substr(0, filename.find_last_of("/\\") + 1);
 
     // StringRef path = sys::path::parent_path(filename);
     auto sub_parser = Parser(config, lexer.get_config(), template_storage, function_storage);
     sub_parser.parse_into(tmpl, path);
   }
 
-  std::string load_file(nonstd::string_view filename) {
+  std::string load_file(const std::string& filename) {
     std::ifstream file;
-    open_file_or_throw(static_cast<std::string>(filename), file);
+    file.open(filename);
+    if (file.fail()) {
+      INJA_THROW(FileError("failed accessing file at '" + filename + "'"));
+    }
     std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
     return text;
   }

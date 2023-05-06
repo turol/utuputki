@@ -3,9 +3,10 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
 #include "doctest/doctest.h"
-#include "inja/inja.hpp"
 
-using json = nlohmann::json;
+#define JSON_USE_IMPLICIT_CONVERSIONS 0
+#define JSON_NO_IO 1
+#include "inja/inja.hpp"
 
 const std::string test_file_directory {"../test/data/"};
 

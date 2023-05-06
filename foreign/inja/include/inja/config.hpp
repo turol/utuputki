@@ -4,7 +4,7 @@
 #include <functional>
 #include <string>
 
-#include "string_view.hpp"
+#include "template.hpp"
 
 namespace inja {
 
@@ -65,6 +65,8 @@ struct LexerConfig {
  */
 struct ParserConfig {
   bool search_included_templates_in_files {true};
+
+  std::function<Template(const std::string&, const std::string&)> include_callback;
 };
 
 /*!

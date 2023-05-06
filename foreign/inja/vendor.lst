@@ -1,9 +1,7 @@
-.clang-format
 .github/FUNDING.yml
 .github/workflows/ci.yml
 .github/workflows/documentation.yml
 .github/workflows/single-include.yml
-.github/workflows/vsenv.bat
 .gitignore
 CMakeLists.txt
 LICENSE
@@ -28,11 +26,11 @@ include/inja/node.hpp
 include/inja/parser.hpp
 include/inja/renderer.hpp
 include/inja/statistics.hpp
-include/inja/string_view.hpp
 include/inja/template.hpp
 include/inja/token.hpp
 include/inja/utils.hpp
 meson.build
+meson_options.txt
 requirements.txt
 scripts/amalgamate_config.json
 scripts/update_single_include.sh

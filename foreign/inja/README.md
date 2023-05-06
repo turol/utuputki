@@ -44,7 +44,6 @@ Inja is a headers only library, which can be downloaded from the [releases](http
 
 // Just for convenience
 using namespace inja;
-using json = nlohmann::json;
 ```
 
 If you are using the [Meson Build System](http://mesonbuild.com), then you can wrap this repository as a subproject.
@@ -154,7 +153,7 @@ render(R"(Guest List:
 	2: Tom
 	3: Patrick */
 ```
-In a loop, the special variables `loop/index (number)`, `loop/index1 (number)`, `loop/is_first (boolean)` and `loop/is_last (boolean)` are defined. In nested loops, the parent loop variables are available e.g. via `loop/parent/index`. You can also iterate over objects like `{% for key, value in time %}`.
+In a loop, the special variables `loop.index (number)`, `loop.index1 (number)`, `loop.is_first (boolean)` and `loop.is_last (boolean)` are defined. In nested loops, the parent loop variables are available e.g. via `loop.parent.index`. You can also iterate over objects like `{% for key, value in time %}`.
 
 #### Conditions
 
@@ -184,12 +183,19 @@ env.render("Content: {% include \"content\" %}", data); // "Content: Hello Peter
 
 // Other template files are included relative from the current file location
 render("{% include \"footer.html\" %}", data);
+```
+If a corresponding template could not be found in the file system, the *include callback* is called:
+```.cpp
+// The callback takes the current path and the wanted include name and returns a template
+env.set_include_callback([&env](const std::string& path, const std::string& template_name) {
+  return env.parse("Hello {{ neighbour }} from " + template_name);
+});
 
 // You can disable to search for templates in the file system via
 env.set_search_included_templates_in_files(false);
 ```
 
-Inja will throw an `inja::RenderError` if an included file is not found. To disable this error, you can call `env.set_throw_at_missing_includes(false)`.
+Inja will throw an `inja::RenderError` if an included file is not found and no callback is specified. To disable this error, you can call `env.set_throw_at_missing_includes(false)`.
 
 #### Assignments
 
@@ -376,10 +382,10 @@ Inja uses exceptions to handle ill-formed template input. However, exceptions ca
 
 ## Supported compilers
 
-Inja uses `string_view` from C++17, but includes the [polyfill](https://github.com/martinmoene/string-view-lite) from martinmoene. This way, the minimum version is C++11. Currently, the following compilers are tested:
+Inja uses the `string_view` feature of the C++17 STL. Currently, the following compilers are tested:
 
-- GCC 5 - 11 (and possibly later)
-- Clang 3.8 - 11 (and possibly later)
-- Microsoft Visual C++ 2016 - 2019 (and possibly later)
+- GCC 7 - 11 (and possibly later)
+- Clang 5 - 12 (and possibly later)
+- Microsoft Visual C++ 2017 15.0 - 2022 (and possibly later)
 
-The unit tests fail to compile with GCC 4.8 but should just work fine. A complete list of supported compiler / os versions can be found in the [CI definition](https://github.com/pantor/inja/blob/master/.github/workflows/ci.yml).
+A list of supported compiler / os versions can be found in the [CI definition](https://github.com/pantor/inja/blob/master/.github/workflows/ci.yml).

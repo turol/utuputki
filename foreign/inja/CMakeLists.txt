@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 
 
-project(inja LANGUAGES CXX VERSION 3.3.0)
+project(inja LANGUAGES CXX VERSION 3.4.0)
 
 
 option(INJA_USE_EMBEDDED_JSON "Use the shipped json header if not available on the system" ON)
@@ -32,7 +32,7 @@ target_include_directories(inja INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:${INJA_INSTALL_INCLUDE_DIR}>
 )
-target_compile_features(inja INTERFACE cxx_std_11)
+target_compile_features(inja INTERFACE cxx_std_17)
 
 
 if(INJA_USE_EMBEDDED_JSON)
@@ -47,7 +47,7 @@ if(INJA_USE_EMBEDDED_JSON)
       $<INSTALL_INTERFACE:${INJA_INSTALL_INCLUDE_DIR}/inja/json/include>
     )
 
-    target_compile_features(nlohmann_json INTERFACE cxx_std_11)
+    target_compile_features(nlohmann_json INTERFACE cxx_std_17)
 
     install(TARGETS nlohmann_json EXPORT injaTargets)
 
@@ -59,6 +59,8 @@ else()
   # If target already exists, e.g. by git submodules
   if(TARGET nlohmann_json)
     set(INJA_SELECTED_JSON_LIBRARY "nlohmann_json::nlohmann_json")
+
+    install(TARGETS nlohmann_json EXPORT injaTargets)
   else()
     find_package(nlohmann_json REQUIRED)
     set(INJA_SELECTED_JSON_LIBRARY "nlohmann_json::nlohmann_json")
@@ -82,12 +84,12 @@ if(BUILD_TESTING AND INJA_BUILD_TESTS)
   if(MSVC)
     target_compile_options(inja_test PRIVATE /W4 /permissive-)
   else()
-    target_compile_options(inja_test PRIVATE -Wall -Wextra -pedantic)
+    target_compile_options(inja_test PRIVATE -Wall -Wextra -Werror)
   endif()
 
 
   add_library(single_inja INTERFACE)
-  target_compile_features(single_inja INTERFACE cxx_std_11)
+  target_compile_features(single_inja INTERFACE cxx_std_17)
   target_include_directories(single_inja INTERFACE single_include include third_party/include)
 
   add_executable(single_inja_test test/test.cpp)
@@ -100,12 +102,6 @@ endif()
 if(BUILD_BENCHMARK)
   add_executable(inja_benchmark test/benchmark.cpp)
   target_link_libraries(inja_benchmark PRIVATE inja)
-
-  if(MSVC)
-    target_compile_options(inja_benchmark PRIVATE /W4 /permissive-)
-  else()
-    target_compile_options(inja_benchmark PRIVATE -Wall -Wextra -pedantic)
-  endif()
 endif()
 
 
