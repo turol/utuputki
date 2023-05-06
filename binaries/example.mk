@@ -32,7 +32,7 @@ OPTFLAGS+=-march=native
 
 # lazy assignment because CFLAGS is changed later
 CXXFLAGS=$(CFLAGS)
-CXXFLAGS+=-std=c++14
+CXXFLAGS+=-std=c++17
 
 
 LDFLAGS:=-g
