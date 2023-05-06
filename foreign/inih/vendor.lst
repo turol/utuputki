@@ -1,0 +1,7 @@
+.gitignore
+.travis.yml
+INIReader.h
+INIReaderTest.cpp
+LICENSE.txt
+README.md
+test.ini
