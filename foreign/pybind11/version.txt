@@ -1,7 +1,7 @@
-commit aa304c9c7d725ffb9d10af08a3b34cb372307020
-Author: Henry Schreiner <HenrySchreinerIII@gmail.com>
-Date:   Fri Jul 15 15:47:47 2022 -0500
+commit 80dc998efced8ceb2be59756668a7e90e8bef917
+Author: Henry Schreiner <henryschreineriii@gmail.com>
+Date:   Mon Oct 31 14:44:51 2022 -0400
 
-    chore: preapre for 2.10.0 release (#4068)
+    chore: bump versions for 2.10.1
     
     Signed-off-by: Henry Schreiner <henryschreineriii@gmail.com>

@@ -2,6 +2,7 @@
 .clang-format
 .clang-tidy
 .cmake-format.yaml
+.codespell-ignore-lines
 .gitattributes
 .github/CODEOWNERS
 .github/CONTRIBUTING.md
@@ -224,10 +225,13 @@ tests/valgrind-python.supp
 tools/FindCatch.cmake
 tools/FindEigen3.cmake
 tools/FindPythonLibsNew.cmake
+tools/JoinPaths.cmake
 tools/check-style.sh
 tools/cmake_uninstall.cmake.in
+tools/codespell_ignore_lines_from_errors.py
 tools/libsize.py
 tools/make_changelog.py
+tools/pybind11.pc.in
 tools/pybind11Common.cmake
 tools/pybind11Config.cmake.in
 tools/pybind11NewTools.cmake
