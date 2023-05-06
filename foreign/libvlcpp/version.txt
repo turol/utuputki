@@ -1,5 +1,10 @@
-commit d75a31a0c4fba59c7a671d5862bfa5bd69095a73
-Author: Hugo Beauzée-Luyssen <hugo@beauzee.fr>
-Date:   Tue Jul 26 10:19:06 2022 +0200
+commit d76fe0678e92ada5897eac975e14edc9981130e8
+Author: Steve Lhomme <robux4@ycbcr.xyz>
+Date:   Mon Mar 27 09:29:08 2023 +0200
 
-    Instance: Clarify endif directive
+    Instance: avoid using asprintf
+    
+    This is a GNU function. We have the tool in C++ to concatenate strings
+    and integers.
+    
+    Fixes #14
